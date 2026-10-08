@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+coverage/
+src/generated/
+next-env.d.ts
+*.tsbuildinfo
+
+# Real environment files must never be committed
+.env
+.env.*
+!.env.example
+
+.DS_Store
+npm-debug.log*

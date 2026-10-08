@@ -1,0 +1,9 @@
+// Domain models arrive in TF-03; TF-01 only wires the generator and datasource.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
