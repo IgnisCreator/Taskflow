@@ -9,7 +9,7 @@ Numbered ADRs, newest last. Language: English (repository convention).
 
 ### Decision
 
-All versions are pinned exactly (`--save-exact`, no ranges) and locked in `package-lock.json`. No `latest`, `beta` or `rc` tag is used.
+All dependency versions are pinned exactly (`--save-exact`, no ranges) and locked in `package-lock.json`; the only range is `engines.node` (`>=24 <25`), which constrains the runtime rather than a package. CI installs the newest Node 24 via `.nvmrc`, while the development machine ran 24.14.1, so `@types/node` 24.19.1 may describe APIs newer than the local runtime. No `latest`, `beta` or `rc` tag is used.
 
 | Package                                      | Version                                             | Published               | Notes                                                                                                                    |
 | -------------------------------------------- | --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
