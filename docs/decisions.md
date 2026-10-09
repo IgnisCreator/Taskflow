@@ -73,11 +73,14 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 | Maintenance                                            | Active; also maintains Auth.js since 2025-09-22                                                                                      | Security fixes only (per Auth.js announcement)               | —                             |
 | Test access                                            | `testUtils()` plugin: helpers create sessions; docs say keep it out of production config                                             | Not evaluated                                                | —                             |
 
-### Risks to verify in TF-02 (not verified yet)
+### Outcome in TF-02 (2026-10-09)
 
-1. Real GitHub login and `npx auth@<exact> generate` schema output against Prisma 7.
-2. `testUtils()` session helper signature and its cookie name for Playwright; it must not be reachable in a production build (acceptance test in TF-02).
-3. Impact on the CV keyword "NextAuth" — decided by the owner.
+1. **Schema:** `npx auth@1.7.7 generate` produced `user`, `session`, `account` and `verification`; the project adds `user.publicId` (random UUID, unique) and a unique `(providerId, accountId)` on `account`. Migration `..._auth`.
+2. **Test sessions:** the `testUtils()` plugin works as documented (`createUser`, `saveUser`, `getAuthHeaders`, `getCookies`). It lives only in a test-only auth instance (`tests/helpers/test-auth.ts`); CI greps `src/` for it and the production bundle was checked to contain none of it. There is no route or flag in the app that can create a session.
+3. **Provider tokens:** stored encrypted (`account.encryptOAuthTokens`); a test fails if the token appears in plain text.
+4. **Origin protection:** with a session cookie, a foreign `Origin` gets 403 `INVALID_ORIGIN` and an off-site `callbackURL` gets 403 `INVALID_CALLBACK_URL`. Better Auth skips these checks when `NODE_ENV` or `TEST` marks a test run (read once at load), so `vitest.config.ts` sets `NODE_ENV=development` and `TEST=false` for the suite.
+5. **Still open:** the real GitHub login is a manual check by the owner (see `docs/validation.md`). GitHub accounts without an email cannot sign in, because Better Auth requires one (the `user:email` scope is requested).
+6. **Impact on the CV keyword "NextAuth":** decided by the owner.
 
 ### Sources (consulted 2026-10-08)
 

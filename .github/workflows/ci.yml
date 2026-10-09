@@ -17,6 +17,27 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Ephemeral database for migrations and integration tests; never a real one.
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: taskflow
+          POSTGRES_PASSWORD: taskflow
+          POSTGRES_DB: taskflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taskflow -d taskflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # Placeholders only: this workflow has no secrets and never reaches GitHub or a real database.
+    env:
+      DATABASE_URL: postgresql://taskflow:taskflow@localhost:5432/taskflow
+      BETTER_AUTH_SECRET: ci-placeholder-secret-0123456789abcdef
+      AUTH_GITHUB_ID: ci-placeholder
+      AUTH_GITHUB_SECRET: ci-placeholder
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -33,10 +54,13 @@ jobs:
         run: npm run format:check
       - name: Typecheck
         run: npm run typecheck
-      # Integration tests will be added in a later milestone.
-      - name: Test
-        run: npm test
       - name: Validate Prisma schema
         run: npm run db:validate
+      - name: Guard against test helpers in app code
+        run: "! grep -rnE 'testUtils|tests/helpers' src"
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Test
+        run: npm test
       - name: Build
         run: npm run build
