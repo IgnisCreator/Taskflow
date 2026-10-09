@@ -1,14 +1,3 @@
-import { getCurrentUser } from "@/server/session";
+import { handle, json, requireUser } from "@/server/http";
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return Response.json(
-      { error: { code: "UNAUTHENTICATED", message: "Sign in required" } },
-      { status: 401, headers: { "Cache-Control": "private, no-store" } },
-    );
-  }
-  return Response.json(user, {
-    headers: { "Cache-Control": "private, no-store" },
-  });
-}
+export const GET = handle(async () => json(await requireUser()));

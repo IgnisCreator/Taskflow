@@ -90,3 +90,18 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - Auth.js joins Better Auth — https://www.better-auth.com/blog/authjs-joins-better-auth
 - Better Auth test utils — https://better-auth.com/docs/plugins/test-utils
 - npm registry metadata for the three packages.
+
+## ADR-003 — API conventions introduced with projects (TF-03)
+
+- **Date:** 2026-10-09
+- **Status:** accepted (TF-03)
+
+### Decision
+
+- **Errors:** every failure is `{ error: { code, message, requestId, fields? } }` with codes `UNAUTHENTICATED` 401, `VALIDATION_ERROR` and `INVALID_JSON` 400, `CSRF_ORIGIN` and `FORBIDDEN` 403, `NOT_FOUND` 404, `BOARD_CONFLICT` 409 (with `currentVersion`), `INTERNAL` 500. Unexpected errors are logged by name only, never with payloads.
+- **Visibility:** a project the caller is not a member of is always `404`, never `403`; a member without permission gets `403`.
+- **CSRF:** every write handler first requires `Origin` to equal the origin of `APP_URL`; a missing or foreign `Origin` is `403 CSRF_ORIGIN`. Browsers always send `Origin` on non-GET fetches. Non-browser clients must send it too.
+- **Concurrency:** writes carry `expectedBoardVersion` in the JSON body (also `DELETE`). The first statement is an `UPDATE ... WHERE boardVersion = expected` that bumps the version and holds the row lock; `count = 0` becomes `409`. Permissions are read again after the lock. No raw SQL, default `READ COMMITTED` isolation.
+- **Inputs:** Zod `strictObject`; unknown keys such as `ownerId` are rejected with `400`.
+- **Default column names are English** ("To do", "In progress", "In review", "Done") instead of the Spanish names in the original plan, because the portfolio demo is in English. Changing them is one array in `src/server/services/projects.ts`.
+- **Deferred:** rate limiting (`429`) is not implemented yet; it is tracked in the backlog notes for the milestone that adds write volume.
