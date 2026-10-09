@@ -174,3 +174,15 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - **Dialogs keep their own version.** A dialog saves with the version from when it opened. If the board changed meanwhile, the server answers 409, the typed text stays, the dialog adopts the current version, and a second save repeats the intent knowingly (nothing is overwritten silently).
 - **Accessible alternative to dragging.** The task dialog has "Column" and "Position" selects and a "Move" button.
 - **End-to-end tests** (`npm run test:e2e`) run against a production build on port 3100 with sessions created by test-only helpers (`tests/e2e/fixtures.ts`; secret and database in `tests/e2e/env.ts`). In CI they run after the build against the service database, after `npx playwright install --with-deps chromium`.
+
+## ADR-008 — Filters and search in SQL (TF-07)
+
+- **Date:** 2026-10-09
+- **Status:** accepted (TF-07)
+
+- **In the URL, in SQL.** `?q=&assignee=&priority=` is read by `parseFilter` (each field validated on its own; a bad or repeated value is ignored) and applied as a Prisma `where` on the tasks of `getBoard`, inside the same REPEATABLE READ snapshot. Filters combine with AND; search is `ILIKE` on title or description. The form is a plain `GET` form, so it works with the keyboard and survives a reload, and polling keeps the URL.
+- **Wildcards are escaped.** Prisma's `contains` becomes `ILIKE` without escaping, so searching `_` or `%` matched every task. The service escapes `\`, `%` and `_`. A test found it.
+- **`total` per column.** Each column also reports its unfiltered count (`_count`), used for the "2 of 3" badge and to know the last position.
+- **Dragging is off while a filter is active** (the visible order is partial). The task dialog then offers only a column and "Move to end", sent as `toIndex = total of the target column, minus the task itself if it stays in its column`; the page does not show an optimistic order, it waits for the server.
+- **Indexes** `(projectId, assigneeId)` and `(projectId, priority)` already exist from TF-03. `EXPLAIN (ANALYZE)` on a project with 200 tasks (rolled-back transaction in the E2E database, PostgreSQL 18.6): the planner picks a sequential scan over the 3-page table (0.05 ms for `priority = 'HIGH'`, 0.12 ms for the `ILIKE` search, 111 of 200 rows matched), and with `enable_seqscan = off` it uses `Task_projectId_priority_idx` (bitmap index scan, 66 rows, 0.05 ms). With the limit of 200 tasks per project the indexes are not needed for speed today; they are cheap and become the plan as soon as the table grows. `ILIKE '%text%'` cannot use a B-tree index at any size (it would need `pg_trgm`, not added: not needed under 200 tasks per project).
+- **Error and empty states.** `src/app/error.tsx` (message and "Try again"), "No tasks match these filters." when every column is empty, and a "Clear" link.

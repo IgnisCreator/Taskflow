@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Board } from "@/components/board";
+import { TaskFilters } from "@/components/task-filters";
+import { isFiltered, parseFilter } from "@/lib/validations/filters";
 import { ApiError } from "@/server/http";
 import { can } from "@/server/policies";
 import { getBoard } from "@/server/services/tasks";
@@ -8,13 +10,16 @@ import { getCurrentUser } from "@/server/session";
 
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const board = await getBoard(user.id, (await params).projectId).catch(
+  const filter = parseFilter(await searchParams);
+  const board = await getBoard(user.id, (await params).projectId, filter).catch(
     (error) => {
       if (error instanceof ApiError && error.status === 404) notFound();
       throw error;
@@ -48,7 +53,9 @@ export default async function ProjectPage({
           </Link>
         </div>
       </div>
+      <TaskFilters filter={filter} members={board.members} />
       <Board
+        filtered={isFiltered(filter)}
         projectId={project.id}
         boardVersion={project.boardVersion}
         canWrite={can(project, "task:write")}
@@ -56,6 +63,7 @@ export default async function ProjectPage({
         columns={board.columns.map((column) => ({
           id: column.id,
           name: column.name,
+          total: column.total,
           tasks: column.tasks.map((task) => ({
             id: task.id,
             columnId: task.columnId,

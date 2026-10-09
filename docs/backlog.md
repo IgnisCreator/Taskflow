@@ -12,5 +12,5 @@ States: `pending` · `in progress` · `blocked` · `validated`.
 | TF-04 | Members, settings, permission matrix                        | validated | `docs/validation.md` (TF-04 section)                                                     |
 | TF-05 | Task CRUD and board without drag                            | validated | `docs/validation.md` (TF-05 section)                                                     |
 | TF-06 | Move/reorder, drag and drop, polling, conflicts             | validated | `docs/validation.md` (TF-06 section)                                                     |
-| TF-07 | Filters, search, responsive, keyboard                       | pending   |                                                                                          |
+| TF-07 | Filters, search, responsive, keyboard                       | validated | `docs/validation.md` (TF-07 section)                                                     |
 | TF-08 | Docker production, full CI, publication, README, demo       | pending   |                                                                                          |

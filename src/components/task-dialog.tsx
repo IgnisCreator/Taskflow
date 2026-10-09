@@ -14,7 +14,13 @@ export type TaskView = {
   dueDate: string | null;
 };
 
-export type ColumnView = { id: string; name: string; tasks: TaskView[] };
+/** `total` counts every task of the column, `tasks` only those that pass the active filter. */
+export type ColumnView = {
+  id: string;
+  name: string;
+  total: number;
+  tasks: TaskView[];
+};
 export type MemberView = { userId: string; name: string };
 
 /** `version` is the board version the user was looking at when the dialog opened. */
@@ -41,6 +47,7 @@ export function TaskDialog({
   members,
   canWrite,
   busy,
+  filtered,
   state,
   onMove,
   onClose,
@@ -50,6 +57,7 @@ export function TaskDialog({
   members: MemberView[];
   canWrite: boolean;
   busy: boolean;
+  filtered: boolean;
   state: DialogState | null;
   onMove: (taskId: string, columnId: string, toIndex: number) => void;
   onClose: () => void;
@@ -224,6 +232,7 @@ export function TaskDialog({
             <MoveControls
               task={task}
               columns={columns}
+              filtered={filtered}
               disabled={busy || pending}
               onMove={(columnId, toIndex) => {
                 onMove(task.id, columnId, toIndex);
@@ -266,11 +275,14 @@ export function TaskDialog({
 function MoveControls({
   task,
   columns,
+  filtered,
   disabled,
   onMove,
 }: {
   task: TaskView;
   columns: ColumnView[];
+  /** With a filter the visible order is partial, so a position cannot be chosen: the task goes last. */
+  filtered: boolean;
   disabled: boolean;
   onMove: (columnId: string, toIndex: number) => void;
 }) {
@@ -280,8 +292,11 @@ function MoveControls({
   const [toIndex, setToIndex] = useState(currentIndex);
 
   const target = columns.find((c) => c.id === columnId);
-  const others = (target?.tasks ?? []).filter((t) => t.id !== task.id).length;
-  const unchanged = columnId === task.columnId && toIndex === currentIndex;
+  const others = filtered
+    ? (target?.total ?? 0) - (columnId === task.columnId ? 1 : 0)
+    : (target?.tasks ?? []).filter((t) => t.id !== task.id).length;
+  const unchanged =
+    !filtered && columnId === task.columnId && toIndex === currentIndex;
 
   return (
     <fieldset className="space-y-3 border-t border-line pt-4">
@@ -310,28 +325,35 @@ function MoveControls({
             ))}
           </select>
         </label>
-        <label className="field">
-          Position
-          <select
-            value={toIndex}
-            className="input"
-            onChange={(event) => setToIndex(Number(event.target.value))}
-          >
-            {Array.from({ length: others + 1 }, (_, index) => (
-              <option key={index} value={index}>
-                {index + 1}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!filtered && (
+          <label className="field">
+            Position
+            <select
+              value={toIndex}
+              className="input"
+              onChange={(event) => setToIndex(Number(event.target.value))}
+            >
+              {Array.from({ length: others + 1 }, (_, index) => (
+                <option key={index} value={index}>
+                  {index + 1}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
+      {filtered && (
+        <p className="text-sm text-muted">
+          Filters are on: the task goes to the end of the column.
+        </p>
+      )}
       <button
         type="button"
         className="btn-secondary"
         disabled={disabled || unchanged}
-        onClick={() => onMove(columnId, toIndex)}
+        onClick={() => onMove(columnId, filtered ? others : toIndex)}
       >
-        Move
+        {filtered ? "Move to end" : "Move"}
       </button>
     </fieldset>
   );

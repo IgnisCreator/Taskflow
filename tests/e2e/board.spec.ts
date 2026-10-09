@@ -229,3 +229,54 @@ test("an edit made while someone else changed the board is kept, flagged, and sa
     "Alpha renamed",
   );
 });
+
+test("keyboard only: filter, open a task and move it while filters are on", async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByLabel("Search").focus();
+  await page.keyboard.type("alpha");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/q=alpha/);
+  await expect(card(page, "Bravo")).toHaveCount(0);
+  await expect(card(page, "Alpha")).toHaveAttribute("aria-disabled", "true");
+  await expect(column(page, "To do").locator("h2 .badge")).toHaveText("1 of 3");
+
+  await card(page, "Alpha").focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Column").focus();
+  await page.keyboard.press("ArrowDown"); // To do -> In progress
+  await expect(dialog.getByLabel("Position")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Move to end" }).focus();
+  const answered = moveAnswered(page);
+  await page.keyboard.press("Enter");
+  await answered;
+
+  expect(await serverBoard(seed.projectId, seed.owner)).toMatchObject({
+    "To do": ["Bravo", "Charlie"],
+    "In progress": ["Delta", "Alpha"],
+  });
+});
+
+test("filters with no results show an empty state, and Clear brings everything back", async ({
+  page,
+}) => {
+  await page.goto(`/projects/${seed.projectId}?q=zzz&priority=BOGUS`);
+  await expect(page.getByText("No tasks match these filters.")).toBeVisible();
+  await page.getByRole("link", { name: "Clear" }).click();
+  await expect(card(page, "Alpha")).toBeVisible();
+});
+
+test("on a phone-sized screen the page does not scroll sideways", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page);
+  await expect(card(page, "Alpha")).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
+});
