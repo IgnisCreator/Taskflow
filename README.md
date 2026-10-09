@@ -25,12 +25,18 @@ See [`docs/decisions.md`](docs/decisions.md).
 ## Getting started
 
 ```bash
-cp .env.example .env
+cp .env.example .env         # then fill in the values (see below)
 npm ci
-docker compose up -d --wait   # PostgreSQL, ready when its healthcheck passes
-npm run db:migrate            # applies migrations explicitly (none yet)
-npm run dev                   # http://localhost:3000
+docker compose up -d --wait  # PostgreSQL, ready when its healthcheck passes
+npm run db:migrate           # applies the migrations explicitly
+npm run dev                  # http://localhost:3000
 ```
+
+### GitHub OAuth app (development)
+
+1. GitHub > Settings > Developer settings > OAuth Apps > New OAuth App.
+2. Homepage URL `http://localhost:3000`; Authorization callback URL `http://localhost:3000/api/auth/callback/github`.
+3. Put the client ID and a generated client secret in `.env` as `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`, and a random `BETTER_AUTH_SECRET` (32+ characters). Never commit `.env`.
 
 ## Scripts
 

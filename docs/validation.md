@@ -84,3 +84,33 @@ Fresh clone of commit `aacccc8` (2026-10-09): `npm ci` 61 s, `lint`, `format:che
 | `docker compose down -v`                                                         | removed only `taskflow-p1_*` resources                                                                                           |
 
 Closes the two items left open on 2026-10-09. The project `name:` was added because a previous Compose project in another folder was also called `taskflow`, and an earlier `down` of this repo removed that project's network.
+
+## TF-02 — authentication, 2026-10-09 (branch `tf-02/auth`)
+
+Run without `.env`, with the same placeholder variables as CI, against the Compose PostgreSQL:
+
+| Command                                                    | Result                                                                                                                                                                              |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`, `format:check`, `typecheck`, `db:validate` | exit 0                                                                                                                                                                              |
+| `npm run db:migrate`                                       | applied `..._auth` (4 tables, `publicId` unique, `(providerId, accountId)` unique)                                                                                                  |
+| `npm test`                                                 | exit 0, 3 files, 13 tests: env validation (4), proxy redirect (1), GitHub login identity and token encryption (2), session API (3), origin protection (2), test-session fixture (1) |
+| `npm run build`                                            | exit 0; routes `/login`, `/profile`, `/api/me`, `/api/auth/[...all]`, proxy                                                                                                         |
+| Guard `grep -rnE 'testUtils\|tests/helpers' src`           | no match; also detects a planted violation                                                                                                                                          |
+| Production bundle search for test helpers                  | none found                                                                                                                                                                          |
+
+Acceptance criteria of TF-02 (from the consolidated plan):
+
+| Criterion                                                    | Evidence                                                                                                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Same provider account, second login keeps the same `User.id` | test "keeps the same user and a single account on a second login" (real handler and database; only GitHub's HTTP endpoints are simulated) |
+| After logout the old cookie is rejected                      | test "rejects the old cookie after logout"                                                                                                |
+| Every protected endpoint without a cookie returns 401        | test "answers 401 without a session cookie" (`/api/me` is the only protected endpoint so far)                                             |
+| Real GitHub login works locally                              | **Not run** — manual check by the owner                                                                                                   |
+
+The tests were mutation-checked: disabling logout, or turning token encryption off, makes the matching test fail. The two origin tests failed until the Vitest environment stopped marking the run as a test (see ADR-002).
+
+Live check with the real `.env` (production build, no login completed): `/login` 200; `/profile` without cookie 307 to `/login`; `/api/me` 401; the GitHub authorize URL carries `redirect_uri=http://localhost:3000/api/auth/callback/github`, scope `read:user user:email` and a `state`.
+
+TF-01 gap closed here: the pull request template (`.github/pull_request_template.md`) was missing from TF-01.
+
+Clean clone of commit `f48466a` (branch `tf-02/auth`) against a fresh PostgreSQL volume, with CI-style placeholder variables and no `.env`: `npm ci`, `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate` (applied the migration from an empty database), `npm test` (13 passed) and `build` all exit 0. A scan of every commit found none of the secret values from the local `.env`.
