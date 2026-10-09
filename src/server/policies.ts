@@ -1,13 +1,17 @@
 import type { ProjectRole } from "@/generated/prisma/enums";
 
 export type ProjectAction =
-  "project:view" | "project:edit" | "project:delete" | "member:manage";
+  | "project:view"
+  | "project:edit"
+  | "project:delete"
+  | "member:manage"
+  | "task:write";
 
 /** Who is asking, relative to one project. The owner always holds an ADMIN membership. */
 export type Actor = { role: ProjectRole; isOwner: boolean };
 
 // Source of truth for permissions (matrix in the consolidated plan, section 5).
-// Task actions are added by TF-05.
+// `task:write` covers create, edit, assign and delete (and, in TF-06, move).
 export function can(actor: Actor, action: ProjectAction): boolean {
   switch (action) {
     case "project:view":
@@ -15,6 +19,8 @@ export function can(actor: Actor, action: ProjectAction): boolean {
     case "project:edit":
     case "member:manage":
       return actor.role === "ADMIN";
+    case "task:write":
+      return actor.role !== "VIEWER";
     case "project:delete":
       return actor.isOwner;
   }

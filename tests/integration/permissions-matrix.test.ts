@@ -11,6 +11,11 @@ const project = await import("@/app/api/projects/[projectId]/route");
 const members = await import("@/app/api/projects/[projectId]/members/route");
 const member =
   await import("@/app/api/projects/[projectId]/members/[userId]/route");
+const board = await import("@/app/api/projects/[projectId]/board/route");
+const tasks = await import("@/app/api/projects/[projectId]/tasks/route");
+const task =
+  await import("@/app/api/projects/[projectId]/tasks/[taskId]/route");
+const { db } = await import("@/server/db");
 
 const BASE = "http://localhost:3000";
 const HEADERS = { origin: BASE, "content-type": "application/json" };
@@ -25,7 +30,12 @@ const KINDS: Kind[] = [
   "anonymous",
 ];
 
-type Ctx = { world: World; projectId: string; actor: Actor | null };
+type Ctx = {
+  world: World;
+  projectId: string;
+  taskId: string;
+  actor: Actor | null;
+};
 type Call = (ctx: Ctx) => Promise<Response>;
 
 const url = (projectId: string, tail = "") =>
@@ -81,6 +91,45 @@ const onMember =
   };
 
 // [route, call, expected status per caller (owner, admin, member, viewer, stranger, anonymous)]
+const onBoard: Call = ({ actor, projectId }) =>
+  callAs(actor, board.GET, send("GET", url(projectId, "/board")), {
+    projectId,
+  });
+
+const onNewTask: Call = async ({ actor, projectId }) => {
+  const column = await db.boardColumn.findFirstOrThrow({
+    where: { projectId, position: 0 },
+  });
+  return callAs(
+    actor,
+    tasks.POST,
+    send("POST", url(projectId, "/tasks"), {
+      id: crypto.randomUUID(),
+      columnId: column.id,
+      title: "New task",
+      expectedBoardVersion: 0,
+    }),
+    { projectId },
+  );
+};
+
+const onTask =
+  (
+    handler: typeof task.PATCH | typeof task.DELETE,
+    method: string,
+    body: object,
+  ): Call =>
+  ({ actor, projectId, taskId }) =>
+    callAs(
+      actor,
+      handler,
+      send(method, url(projectId, `/tasks/${taskId}`), body),
+      {
+        projectId,
+        taskId,
+      },
+    );
+
 const matrix: [string, Call, number[]][] = [
   [
     "GET project",
@@ -184,6 +233,19 @@ const matrix: [string, Call, number[]][] = [
     }),
     [403, 403, 403, 403, 404, 401],
   ],
+  // Tasks: owner, admin and member write; a viewer only reads.
+  ["GET board", onBoard, [200, 200, 200, 200, 404, 401]],
+  ["POST task", onNewTask, [201, 201, 201, 403, 404, 401]],
+  [
+    "PATCH task",
+    onTask(task.PATCH, "PATCH", { title: "Edited", expectedBoardVersion: 0 }),
+    [200, 200, 200, 403, 404, 401],
+  ],
+  [
+    "DELETE task",
+    onTask(task.DELETE, "DELETE", { expectedBoardVersion: 0 }),
+    [204, 204, 204, 403, 404, 401],
+  ],
 ];
 
 let world: World;
@@ -200,10 +262,15 @@ describe.each(matrix)("%s", (_route, call, expected) => {
   it.each(KINDS.map((kind, i) => [kind, expected[i]!] as const))(
     "%s gets %i",
     async (kind, status) => {
-      const { projectId } = await createProjectFor(world);
+      const { projectId, taskId } = await createProjectFor(world);
       const before = await snapshot(projectId);
 
-      const res = await call({ world, projectId, actor: actorOf(kind) });
+      const res = await call({
+        world,
+        projectId,
+        taskId,
+        actor: actorOf(kind),
+      });
 
       expect(res.status).toBe(status);
       const readOnly = _route.startsWith("GET");
