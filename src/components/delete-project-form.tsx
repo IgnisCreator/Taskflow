@@ -35,12 +35,9 @@ export function DeleteProjectForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="card space-y-4 border-red-200 bg-red-50/40"
-    >
-      <h2 className="text-lg font-semibold text-red-800">Delete project</h2>
-      <p className="text-sm text-slate-700">
+    <form onSubmit={onSubmit} className="card-danger space-y-4">
+      <h2 className="text-lg font-semibold text-danger-text">Delete project</h2>
+      <p className="text-sm text-muted">
         This permanently deletes the project, its board and its tasks. Type{" "}
         <strong>{name}</strong> to confirm.
       </p>

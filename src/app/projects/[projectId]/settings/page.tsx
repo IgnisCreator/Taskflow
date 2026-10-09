@@ -26,7 +26,7 @@ export default async function SettingsPage({
       <p className="text-sm">
         <Link
           href={`/projects/${projectId}`}
-          className="text-indigo-700 hover:underline"
+          className="text-link hover:underline"
         >
           &larr; Back to {project.name}
         </Link>
@@ -40,7 +40,7 @@ export default async function SettingsPage({
           description={project.description}
         />
       ) : (
-        <p className="card text-slate-600">
+        <p className="card text-muted">
           Only an admin can edit the project details.
         </p>
       )}

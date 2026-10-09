@@ -1,32 +1,144 @@
 @import "tailwindcss";
 
-/* Shared building blocks so forms and pages stay consistent without repeating long class lists. */
+/*
+ * TaskFlow design tokens. The full guide is docs/design.md.
+ *
+ * Four colours, each with a few roles:
+ *   Neutral  page, surface, subtle, line, control, fg, muted
+ *   Primary  primary, primary-hover, primary-fg, link
+ *   Danger   danger, danger-hover, danger-fg, danger-text, danger-soft
+ *   Success  success-text, success-soft
+ *
+ * Pages and components use ONLY these roles (bg-surface, text-muted, border-line, ...), never raw
+ * Tailwind colours; CI rejects them. The same classes then work in both themes.
+ *
+ * Theme: follows the system unless the user chose one (cookie "theme" sets data-theme on <html>).
+ * The dark values are written twice (system preference, explicit choice); a unit test keeps
+ * both copies identical and checks WCAG AA contrast for every pair that is used.
+ */
+:root {
+  color-scheme: light;
+  --page: #f8fafc;
+  --surface: #ffffff;
+  --subtle: #f1f5f9;
+  --line: #e2e8f0;
+  --control: #6b7a90;
+  --fg: #0f172a;
+  --muted: #475569;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-fg: #ffffff;
+  --link: #4338ca;
+  --danger: #b91c1c;
+  --danger-hover: #991b1b;
+  --danger-fg: #ffffff;
+  --danger-text: #b91c1c;
+  --danger-soft: #fef2f2;
+  --success-text: #047857;
+  --success-soft: #ecfdf5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #020617;
+    --surface: #0f172a;
+    --subtle: #1e293b;
+    --line: #334155;
+    --control: #64748b;
+    --fg: #f1f5f9;
+    --muted: #94a3b8;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-fg: #ffffff;
+    --link: #a5b4fc;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --danger-fg: #ffffff;
+    --danger-text: #fca5a5;
+    --danger-soft: #2a0f14;
+    --success-text: #6ee7b7;
+    --success-soft: #052e22;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #020617;
+  --surface: #0f172a;
+  --subtle: #1e293b;
+  --line: #334155;
+  --control: #64748b;
+  --fg: #f1f5f9;
+  --muted: #94a3b8;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-fg: #ffffff;
+  --link: #a5b4fc;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-fg: #ffffff;
+  --danger-text: #fca5a5;
+  --danger-soft: #2a0f14;
+  --success-text: #6ee7b7;
+  --success-soft: #052e22;
+}
+
+/* Exposes each role as a Tailwind colour (bg-page, text-fg, border-line, ...). */
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-control: var(--control);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-link: var(--link);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-text: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-success-text: var(--success-text);
+  --color-success-soft: var(--success-soft);
+}
+
+/* Shared building blocks; see docs/design.md for when to use each. */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg shadow-sm hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md border border-control bg-surface px-3 py-2 text-sm font-medium text-fg shadow-sm hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-danger {
-    @apply inline-flex items-center justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md bg-danger px-3 py-2 text-sm font-medium text-danger-fg shadow-sm hover:bg-danger-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-text disabled:cursor-not-allowed disabled:opacity-50;
   }
   .field {
-    @apply block text-sm font-medium text-slate-700;
+    @apply block text-sm font-medium text-fg;
   }
   .input {
-    @apply mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:border-indigo-500 focus-visible:outline-2 focus-visible:outline-indigo-500;
+    @apply mt-1 block w-full rounded-md border border-control bg-surface px-3 py-2 text-sm text-fg shadow-sm focus-visible:border-link focus-visible:outline-2 focus-visible:outline-link;
   }
   .card {
-    @apply rounded-lg border border-slate-200 bg-white p-5 shadow-sm;
+    @apply rounded-lg border border-line bg-surface p-5 text-fg shadow-sm;
+  }
+  .card-danger {
+    @apply rounded-lg border border-danger bg-danger-soft p-5 text-fg;
   }
   .badge {
-    @apply inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 capitalize;
+    @apply inline-flex items-center rounded-full bg-subtle px-2 py-0.5 text-xs font-medium text-muted capitalize;
+  }
+  .link {
+    @apply text-link hover:underline;
   }
   .error {
-    @apply text-sm text-red-700;
+    @apply text-sm text-danger-text;
   }
   .notice {
-    @apply text-sm text-green-700;
+    @apply text-sm text-success-text;
   }
 }
