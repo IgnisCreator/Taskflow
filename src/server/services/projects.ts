@@ -2,17 +2,14 @@ import "server-only";
 import type {
   CreateProjectInput,
   ListProjectsQuery,
+  UpdateProjectInput,
 } from "@/lib/validations/projects";
 import { db } from "@/server/db";
-import { ApiError } from "@/server/http";
-import { can } from "@/server/policies";
+import { withProjectLock } from "@/server/project-lock";
 
 const DEFAULT_COLUMNS = ["To do", "In progress", "In review", "Done"];
 
-const notFound = () => new ApiError(404, "NOT_FOUND", "Project not found");
-const forbidden = () => new ApiError(403, "FORBIDDEN", "Not allowed");
-
-const projectSelect = (userId: string) =>
+export const projectSelect = (userId: string) =>
   ({
     id: true,
     name: true,
@@ -81,45 +78,36 @@ export async function getProject(userId: string, projectId: string) {
   return row ? toView(row, userId) : null;
 }
 
+export async function updateProject(
+  userId: string,
+  projectId: string,
+  { expectedBoardVersion, ...changes }: UpdateProjectInput,
+) {
+  const { result } = await withProjectLock(
+    userId,
+    projectId,
+    expectedBoardVersion,
+    "project:edit",
+    (tx) =>
+      tx.project.update({
+        where: { id: projectId },
+        data: changes,
+        select: projectSelect(userId),
+      }),
+  );
+  return toView(result, userId);
+}
+
 export async function deleteProject(
   userId: string,
   projectId: string,
   expectedBoardVersion: number,
 ) {
-  const project = await getProject(userId, projectId);
-  if (!project) throw notFound();
-  if (!can(project, "project:delete")) throw forbidden();
-
-  await db.$transaction(async (tx) => {
-    // Optimistic lock: this UPDATE holds the project row until commit and fails on a stale version.
-    const locked = await tx.project.updateMany({
-      where: { id: projectId, boardVersion: expectedBoardVersion },
-      data: { boardVersion: { increment: 1 } },
-    });
-    if (locked.count === 0) {
-      const current = await tx.project.findUnique({
-        where: { id: projectId },
-        select: { boardVersion: true },
-      });
-      if (!current) throw notFound();
-      throw new ApiError(409, "BOARD_CONFLICT", "The board changed", {
-        currentVersion: current.boardVersion,
-      });
-    }
-    // Authority is read again now that the row is locked.
-    const fresh = await tx.project.findFirst({
-      where: { id: projectId, members: { some: { userId } } },
-      select: {
-        ownerId: true,
-        members: { where: { userId }, select: { role: true } },
-      },
-    });
-    if (!fresh) throw notFound();
-    const actor = {
-      role: fresh.members[0]!.role,
-      isOwner: fresh.ownerId === userId,
-    };
-    if (!can(actor, "project:delete")) throw forbidden();
-    await tx.project.delete({ where: { id: projectId } });
-  });
+  await withProjectLock(
+    userId,
+    projectId,
+    expectedBoardVersion,
+    "project:delete",
+    (tx) => tx.project.delete({ where: { id: projectId } }),
+  );
 }

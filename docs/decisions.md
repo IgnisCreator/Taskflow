@@ -101,7 +101,20 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - **Errors:** every failure is `{ error: { code, message, requestId, fields? } }` with codes `UNAUTHENTICATED` 401, `VALIDATION_ERROR` and `INVALID_JSON` 400, `CSRF_ORIGIN` and `FORBIDDEN` 403, `NOT_FOUND` 404, `BOARD_CONFLICT` 409 (with `currentVersion`), `INTERNAL` 500. Unexpected errors are logged by name only, never with payloads.
 - **Visibility:** a project the caller is not a member of is always `404`, never `403`; a member without permission gets `403`.
 - **CSRF:** every write handler first requires `Origin` to equal the origin of `APP_URL`; a missing or foreign `Origin` is `403 CSRF_ORIGIN`. Browsers always send `Origin` on non-GET fetches. Non-browser clients must send it too.
-- **Concurrency:** writes carry `expectedBoardVersion` in the JSON body (also `DELETE`). The first statement is an `UPDATE ... WHERE boardVersion = expected` that bumps the version and holds the row lock; `count = 0` becomes `409`. Permissions are read again after the lock. No raw SQL, default `READ COMMITTED` isolation.
+- **Concurrency:** every write carries `expectedBoardVersion` in the JSON body (also `DELETE`) and goes through `withProjectLock` (`src/server/project-lock.ts`): one `UPDATE project SET boardVersion = boardVersion + 1 WHERE id AND boardVersion = expected AND caller is a member` takes the row lock; `count = 0` becomes `404` for a non-member or `409` for a stale version. Only then is the caller's role read, so a demotion that committed first is honoured. Permissions failing after the lock throw and roll back the bump. No raw SQL, default `READ COMMITTED`.
 - **Inputs:** Zod `strictObject`; unknown keys such as `ownerId` are rejected with `400`.
 - **Default column names are English** ("To do", "In progress", "In review", "Done") instead of the Spanish names in the original plan, because the portfolio demo is in English. Changing them is one array in `src/server/services/projects.ts`.
 - **Deferred:** rate limiting (`429`) is not implemented yet; it is tracked in the backlog notes for the milestone that adds write volume.
+
+## ADR-004 — Member management rules (TF-04)
+
+- **Date:** 2026-10-09
+- **Status:** accepted (TF-04)
+
+### Decision
+
+- The owner and ADMINs add, change and remove MEMBER and VIEWER. **Only the owner** may grant, change or remove an ADMIN, and an ADMIN acting on themselves counts as touching an ADMIN. **Nobody** can change or remove the owner, and there is no voluntary leaving or ownership transfer in v1. The rules live in `canManageMember` (`src/server/policies.ts`); the coarse `member:manage` gate (owner or ADMIN) runs first, inside the lock.
+- Collaborators are added by `publicId` (random UUID). An unknown ID is `404 USER_NOT_FOUND`, an existing member `409 MEMBER_EXISTS`, and a sixth member `409 LIMIT_REACHED` (counted inside the lock).
+- Removing a member un-assigns their tasks in the same transaction (the composite foreign key is `NO ACTION`, so removal would fail otherwise); authorship (`createdById`) is kept.
+- Member responses never include email, `publicId` or tokens.
+- The settings UI hides controls the caller cannot use with the same `canManageMember`; the server remains the only authority.

@@ -1,4 +1,7 @@
-import { deleteProjectSchema } from "@/lib/validations/projects";
+import {
+  updateProjectSchema,
+  versionedSchema,
+} from "@/lib/validations/projects";
 import {
   ApiError,
   assertSameOrigin,
@@ -8,7 +11,11 @@ import {
   readJson,
   requireUser,
 } from "@/server/http";
-import { deleteProject, getProject } from "@/server/services/projects";
+import {
+  deleteProject,
+  getProject,
+  updateProject,
+} from "@/server/services/projects";
 
 type Context = { params: Promise<{ projectId: string }> };
 
@@ -19,10 +26,17 @@ export const GET = handle(async (_request: Request, { params }: Context) => {
   return json(project);
 });
 
+export const PATCH = handle(async (request: Request, { params }: Context) => {
+  assertSameOrigin(request);
+  const user = await requireUser();
+  const input = await readJson(request, updateProjectSchema);
+  return json(await updateProject(user.id, (await params).projectId, input));
+});
+
 export const DELETE = handle(async (request: Request, { params }: Context) => {
   assertSameOrigin(request);
   const user = await requireUser();
-  const { expectedBoardVersion } = await readJson(request, deleteProjectSchema);
+  const { expectedBoardVersion } = await readJson(request, versionedSchema);
   await deleteProject(user.id, (await params).projectId, expectedBoardVersion);
   return noContent();
 });
