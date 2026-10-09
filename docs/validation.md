@@ -71,3 +71,5 @@ Applied the verified findings of the over-engineering audit (4 direct dependenci
 | `next build` leaves `tsconfig.json` unchanged                                                      | yes, with the original `lib`/`allowJs` kept                                                                                                                                                              |
 
 Not verified: that `prisma/migrations` is Prisma 7's default migrations path (the explicit setting was kept), and a fresh-clone `npm ci` after this change (see next entry).
+
+Fresh clone of commit `aacccc8` (2026-10-09): `npm ci` 61 s, `lint`, `format:check`, `typecheck`, `test` (3 passed), `db:validate` and `build` all exit 0. Direct dependencies: 6 production + 10 development, none with a version range. The full PostgreSQL migrate run remains un-reverified until Docker is running.
