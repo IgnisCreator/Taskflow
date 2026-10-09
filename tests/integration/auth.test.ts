@@ -1,17 +1,8 @@
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { cleanupTestData } from "../helpers/actors";
 import { githubUser, stubGithub } from "../helpers/github";
+import { setRequestHeaders } from "../helpers/request-context";
 import { testAuth } from "../helpers/test-auth";
-
-let requestHeaders = new Headers();
-vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
 
 const { auth } = await import("@/server/auth");
 const { db } = await import("@/server/db");
@@ -41,16 +32,12 @@ async function loginWithGithub() {
 }
 
 async function meWith(cookie: string) {
-  requestHeaders = new Headers(cookie ? { cookie } : {});
+  setRequestHeaders(new Headers(cookie ? { cookie } : {}));
   return me();
 }
 
-async function cleanup() {
-  await db.user.deleteMany({ where: { email: { endsWith: "@example.test" } } });
-}
-
-beforeAll(cleanup);
-afterAll(cleanup);
+beforeAll(cleanupTestData);
+afterAll(cleanupTestData);
 beforeEach(() => stubGithub());
 
 describe("GitHub login", () => {

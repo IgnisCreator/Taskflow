@@ -1,5 +1,5 @@
 // Authentication tables come from `auth generate` (Better Auth 1.7.7) plus the project additions
-// marked below. Domain models arrive in TF-03.
+// marked below. Domain models (TF-03) follow the auth tables.
 
 generator client {
   provider = "prisma-client"
@@ -11,17 +11,22 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  /** Random, shareable identifier used to add collaborators (the email is never a permission). */
-  publicId      String    @unique @default(uuid())
+  id            String          @id
+  /**
+   * Random, shareable identifier used to add collaborators (the email is never a permission).
+   */
+  publicId      String          @unique @default(uuid())
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean         @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   sessions      Session[]
   accounts      Account[]
+  ownedProjects Project[]
+  memberships   ProjectMember[]
+  createdTasks  Task[]
 
   @@unique([email])
   @@map("user")
@@ -74,4 +79,82 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+enum ProjectRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Project {
+  id           String          @id @default(uuid())
+  name         String
+  description  String?
+  /// The single owner. Ownership is derived from this field only; there is no persisted OWNER role.
+  ownerId      String
+  owner        User            @relation(fields: [ownerId], references: [id])
+  /// Bumped once by every board mutation; used for optimistic concurrency (expectedBoardVersion).
+  boardVersion Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  members      ProjectMember[]
+  columns      BoardColumn[]
+  tasks        Task[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      ProjectRole
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+  assigned  Task[]
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model BoardColumn {
+  id        String  @id @default(uuid())
+  projectId String
+  name      String
+  position  Int
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@unique([projectId, id])
+  @@unique([projectId, position])
+}
+
+model Task {
+  id          String         @id @default(uuid())
+  projectId   String
+  columnId    String
+  title       String
+  description String?
+  priority    Priority       @default(MEDIUM)
+  assigneeId  String?
+  /// Calendar date (YYYY-MM-DD), no time zone.
+  dueDate     DateTime?      @db.Date
+  position    Int
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Composite foreign keys keep a task, its column and its assignee inside one project.
+  // NoAction (verified in verificacion/06_experimento_fk.md): never SetNull, it would null projectId.
+  column      BoardColumn    @relation(fields: [projectId, columnId], references: [projectId, id], onDelete: NoAction)
+  assignee    ProjectMember? @relation(fields: [projectId, assigneeId], references: [projectId, userId], onDelete: NoAction)
+  createdBy   User           @relation(fields: [createdById], references: [id])
+
+  @@index([projectId, columnId, position])
+  @@index([projectId, assigneeId])
+  @@index([projectId, priority])
 }

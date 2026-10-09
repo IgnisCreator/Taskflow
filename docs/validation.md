@@ -114,3 +114,23 @@ Live check with the real `.env` (production build, no login completed): `/login`
 TF-01 gap closed here: the pull request template (`.github/pull_request_template.md`) was missing from TF-01.
 
 Clean clone of commit `f48466a` (branch `tf-02/auth`) against a fresh PostgreSQL volume, with CI-style placeholder variables and no `.env`: `npm ci`, `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate` (applied the migration from an empty database), `npm test` (13 passed) and `build` all exit 0. A scan of every commit found none of the secret values from the local `.env`.
+
+## TF-03 — domain schema and projects, 2026-10-09 (branch `tf-03/projects`)
+
+Checks without `.env`, with the CI placeholder variables, against the Compose PostgreSQL: `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate` (applies `..._auth` and `..._domain`), `npm test` (5 files, 33 tests) and `build` all exit 0; routes added: `/projects`, `/projects/[projectId]`, `/api/projects`, `/api/projects/[projectId]`. The migration SQL declares `ON DELETE NO ACTION` on both composite foreign keys.
+
+| Acceptance criterion (plan)                                                  | Evidence                                                                                                                                           |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project is born with owner as ADMIN member and four columns at positions 0–3 | "creates the project, the owner's ADMIN membership and four ordered columns"                                                                       |
+| A failure rolls everything back                                              | "leaves nothing behind when creating the columns fails": a trigger raises an error while columns are inserted; no project and no membership remain |
+| A project of someone else is not revealed                                    | "does not reveal a project to someone outside it": 404 on read and delete, absent from the list                                                    |
+| Deleting a project with an assigned task returns 204 and leaves no orphans   | "deletes the project with its tasks, columns and members, and keeps the users"                                                                     |
+| `prisma validate` and a non-empty migration                                  | both checked                                                                                                                                       |
+
+Also covered: validation (empty or oversized name, oversized description, unknown `ownerId`, malformed JSON), 401 on all four project endpoints, foreign or missing `Origin` on writes, ADMIN/MEMBER/VIEWER members can read but get 403 on delete, stale version 409, cursor pagination and the 50-item cap, and the permission table (`tests/unit/policies.test.ts`).
+
+Mutation checks (each made one test fail, then reverted): delete without the version check, non-atomic creation, visibility without the membership filter.
+
+Live check (production build, session created with the test helpers): anonymous `/projects` and `/projects/<id>` redirect (307) to `/login` and `/api/projects` returns 401; signed in, `/projects` (200) lists the project and the creation form, `/projects/<id>` (200) shows its name and description, an unknown id is 404. The test data was removed afterwards.
+
+Not covered yet: the browser flow of the creation form (no end-to-end test until Playwright), rate limiting, and the manual real GitHub login of TF-02.
