@@ -11,16 +11,32 @@ export default async function ProjectsPage() {
   const { items } = await listProjects(user.id, { limit: 50 });
 
   return (
-    <main>
-      <h1>Projects</h1>
+    <main className="space-y-8">
+      <h1 className="text-2xl font-semibold">Projects</h1>
       {items.length === 0 ? (
-        <p>You have no projects yet. Create the first one below.</p>
+        <p className="card text-slate-600">
+          You have no projects yet. Create the first one below.
+        </p>
       ) : (
-        <ul>
+        <ul className="grid gap-3 sm:grid-cols-2">
           {items.map((project) => (
             <li key={project.id}>
-              <Link href={`/projects/${project.id}`}>{project.name}</Link>{" "}
-              <small>({project.isOwner ? "owner" : project.role})</small>
+              <Link
+                href={`/projects/${project.id}`}
+                className="card block hover:border-indigo-300"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{project.name}</span>
+                  <span className="badge">
+                    {project.isOwner ? "owner" : project.role}
+                  </span>
+                </span>
+                {project.description && (
+                  <span className="mt-1 line-clamp-2 block text-sm text-slate-600">
+                    {project.description}
+                  </span>
+                )}
+              </Link>
             </li>
           ))}
         </ul>

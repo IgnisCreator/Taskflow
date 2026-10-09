@@ -37,22 +37,27 @@ export function CreateProjectForm() {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>New project</h2>
-      <p>
-        <label>
-          Name
-          <input name="name" required maxLength={80} />
-        </label>
-      </p>
-      <p>
-        <label>
-          Description (optional)
-          <textarea name="description" maxLength={5000} />
-        </label>
-      </p>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={pending}>
+    <form onSubmit={onSubmit} className="card space-y-4">
+      <h2 className="text-lg font-semibold">New project</h2>
+      <label className="field">
+        Name
+        <input name="name" required maxLength={80} className="input" />
+      </label>
+      <label className="field">
+        Description (optional)
+        <textarea
+          name="description"
+          maxLength={5000}
+          rows={3}
+          className="input"
+        />
+      </label>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <button type="submit" disabled={pending} className="btn">
         {pending ? "Creating..." : "Create project"}
       </button>
     </form>

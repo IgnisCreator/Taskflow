@@ -22,11 +22,16 @@ export default async function SettingsPage({
   const members = await listMembers(user.id, projectId);
 
   return (
-    <main>
-      <p>
-        <Link href={`/projects/${projectId}`}>Back to {project.name}</Link>
+    <main className="space-y-6">
+      <p className="text-sm">
+        <Link
+          href={`/projects/${projectId}`}
+          className="text-indigo-700 hover:underline"
+        >
+          &larr; Back to {project.name}
+        </Link>
       </p>
-      <h1>Settings</h1>
+      <h1 className="text-2xl font-semibold">Settings</h1>
       {can(project, "project:edit") ? (
         <ProjectDetailsForm
           projectId={projectId}
@@ -35,7 +40,9 @@ export default async function SettingsPage({
           description={project.description}
         />
       ) : (
-        <p>Only an admin can edit the project details.</p>
+        <p className="card text-slate-600">
+          Only an admin can edit the project details.
+        </p>
       )}
       <MembersPanel
         projectId={projectId}

@@ -35,20 +35,33 @@ export function DeleteProjectForm({
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>Delete project</h2>
-      <p>
+    <form
+      onSubmit={onSubmit}
+      className="card space-y-4 border-red-200 bg-red-50/40"
+    >
+      <h2 className="text-lg font-semibold text-red-800">Delete project</h2>
+      <p className="text-sm text-slate-700">
         This permanently deletes the project, its board and its tasks. Type{" "}
         <strong>{name}</strong> to confirm.
       </p>
-      <p>
-        <label>
-          Project name
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} />
-        </label>
-      </p>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={pending || typed !== name}>
+      <label className="field">
+        Project name
+        <input
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          className="input"
+        />
+      </label>
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={pending || typed !== name}
+        className="btn-danger"
+      >
         Delete project
       </button>
     </form>
