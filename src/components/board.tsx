@@ -47,12 +47,15 @@ export function Board({
   canWrite,
   columns,
   members,
+  filtered,
 }: {
   projectId: string;
   boardVersion: number;
   canWrite: boolean;
   columns: ColumnView[];
   members: MemberView[];
+  /** A filter is active: the board shows part of the tasks, so dragging is off. */
+  filtered: boolean;
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -120,8 +123,9 @@ export function Board({
     toIndex: number,
   ) {
     if (busy) return;
-    const next = moveTask(shown, taskId, columnId, toIndex);
-    if (!next || next === shown) return;
+    // Filtered: the visible order is partial, so there is nothing to show ahead of the server.
+    const next = filtered ? shown : moveTask(shown, taskId, columnId, toIndex);
+    if (!next || (!filtered && next === shown)) return;
 
     const mine = { base: columns, columns: next };
     setLocal(mine);
@@ -209,6 +213,9 @@ export function Board({
           },
         }}
       >
+        {filtered && shown.every((column) => column.tasks.length === 0) && (
+          <p className="notice">No tasks match these filters.</p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {shown.map((column) => (
             <BoardColumn
@@ -217,6 +224,7 @@ export function Board({
               members={members}
               canWrite={canWrite}
               busy={busy}
+              filtered={filtered}
               onOpen={(task) =>
                 setDialog({ mode: "edit", task, version: boardVersion })
               }
@@ -242,6 +250,7 @@ export function Board({
         members={members}
         canWrite={canWrite}
         busy={busy}
+        filtered={filtered}
         state={dialog}
         onMove={(taskId, columnId, toIndex) =>
           void requestMove(taskId, columnId, toIndex)
@@ -257,6 +266,7 @@ function BoardColumn({
   members,
   canWrite,
   busy,
+  filtered,
   onOpen,
   onAdd,
 }: {
@@ -264,6 +274,7 @@ function BoardColumn({
   members: MemberView[];
   canWrite: boolean;
   busy: boolean;
+  filtered: boolean;
   onOpen: (task: TaskView) => void;
   onAdd: () => void;
 }) {
@@ -279,7 +290,11 @@ function BoardColumn({
         className="flex items-center justify-between text-sm font-semibold"
       >
         {column.name}
-        <span className="badge">{column.tasks.length}</span>
+        <span className="badge">
+          {filtered
+            ? `${column.tasks.length} of ${column.total}`
+            : column.tasks.length}
+        </span>
       </h2>
       <ul className="space-y-2">
         {column.tasks.map((task) => (
@@ -287,7 +302,7 @@ function BoardColumn({
             <TaskCard
               task={task}
               members={members}
-              disabled={!canWrite || busy}
+              disabled={!canWrite || busy || filtered}
               onOpen={() => onOpen(task)}
             />
           </li>

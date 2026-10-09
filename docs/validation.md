@@ -222,3 +222,22 @@ Real problems found while testing: (1) with the connection fully lost, `router.r
 Visual check: a screenshot in the middle of a drag shows the original card faded, the floating card over the target column, and the column outlined with the primary colour.
 
 Not covered: dragging by touch and by keyboard in the browser tests (the sensors are enabled; the keyboard and screen-reader path relies on the dialog controls, which are tested), conflicts between two real browsers beyond the simulated ones, a screen-reader pass, and the filters (TF-07). The Playwright download is large (about 720 MB for Chromium, its headless shell and ffmpeg in the user cache).
+
+## TF-07 — filters, search, empty/error states, keyboard, 2026-10-09 (branch `tf-07/filters`)
+
+Checks with the CI placeholder variables: `lint`, `format:check`, `typecheck`, `npm test` (14 files, 321 tests), `build` and `npm run test:e2e` (12 browser tests) pass. No new migration (the two indexes came with TF-03).
+
+| Acceptance criterion (plan)                      | Evidence                                                                                                                                                   |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Combinable filters and search, in SQL            | `tests/integration/filters.test.ts`: search in title and description ignoring case, priority, assignee, unassigned, AND combinations, order kept           |
+| Indexes explained with a real `EXPLAIN`          | ADR-008 (plan with and without `enable_seqscan`)                                                                                                           |
+| Main flow with the keyboard only                 | E2E "keyboard only": type in Search, Enter, focus card, Enter, change the column select with the arrow key, "Move to end" with Enter; server order checked |
+| Drag disabled with filters; move goes to the end | same E2E (`aria-disabled="true"` on the card, "1 of 3" badge, Alpha ends last in "In progress")                                                            |
+| Empty and error states                           | E2E "no results" (also with an invalid priority in the URL, ignored); `src/app/error.tsx`                                                                  |
+| Responsive                                       | E2E at 375 px: no horizontal scroll, screenshot checked (filters wrap, columns stack)                                                                      |
+
+Real problem found: searching `_` or `%` returned every task (Prisma does not escape `ILIKE` wildcards); fixed and covered.
+
+Mutation checks (each made a test fail, then reverted): no wildcard escaping (1 test), drag not disabled while filtered (E2E; the first attempt was invalid because the E2E runs a production build and I had not rebuilt, the second one, rebuilt, failed as expected).
+
+Not covered: a screen-reader pass, touch and keyboard drag in the browser tests, a combined filter by text and a tab in a second browser, creating a task while a filter hides it (it is created, and may not show until the filter is cleared).

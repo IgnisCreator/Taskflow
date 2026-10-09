@@ -1,5 +1,6 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
+import { UNASSIGNED, type TaskFilter } from "@/lib/validations/filters";
 import { MAX_TASKS } from "@/lib/validations/tasks";
 import type {
   CreateTaskInput,
@@ -67,8 +68,25 @@ async function assertAssignee(
 /**
  * Consistent snapshot of a board: project, ordered columns with ordered tasks, and members.
  * One REPEATABLE READ transaction, so the data and `boardVersion` come from the same moment.
+ * `filter` is applied in SQL; each column also reports `total`, its task count ignoring the filter.
  */
-export async function getBoard(userId: string, projectId: string) {
+export async function getBoard(
+  userId: string,
+  projectId: string,
+  filter: TaskFilter = {},
+) {
+  // `contains` becomes ILIKE and Prisma does not escape the wildcards: "_" or "%" would match everything.
+  const q = filter.q?.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const where: Prisma.TaskWhereInput = {
+    priority: filter.priority,
+    assigneeId: filter.assignee === UNASSIGNED ? null : filter.assignee,
+    OR: q
+      ? [
+          { title: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ]
+      : undefined,
+  };
   return db.$transaction(
     async (tx) => {
       const project = await tx.project.findFirst({
@@ -93,7 +111,12 @@ export async function getBoard(userId: string, projectId: string) {
               id: true,
               name: true,
               position: true,
-              tasks: { orderBy: { position: "asc" }, select: taskSelect },
+              _count: { select: { tasks: true } },
+              tasks: {
+                where,
+                orderBy: { position: "asc" },
+                select: taskSelect,
+              },
             },
           },
         },
@@ -117,8 +140,9 @@ export async function getBoard(userId: string, projectId: string) {
           role: m.role,
           isOwner: m.userId === project.ownerId,
         })),
-        columns: project.columns.map((column) => ({
+        columns: project.columns.map(({ _count, ...column }) => ({
           ...column,
+          total: _count.tasks,
           tasks: column.tasks.map(toTask),
         })),
       };
