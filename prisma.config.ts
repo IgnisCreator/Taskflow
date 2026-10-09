@@ -1,5 +1,9 @@
-import "dotenv/config";
 import { defineConfig } from "prisma/config";
+
+// Prisma 7 does not load .env; Node does. CI has no .env, hence the catch.
+try {
+  process.loadEnvFile();
+} catch {}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

@@ -58,3 +58,16 @@ Gemini review outcome (cross-checked against evidence, not accepted at face valu
 | "`actions/checkout@v7` / `setup-node@v7` do not exist"                    | **False**: GitHub API returned v7.0.1 (2026-07-20) and v7.1.0 (2026-10-08)  |
 
 Lesson: Gemini's knowledge predates these releases; its factual claims about versions are not evidence.
+
+## Post-audit simplification — 2026-10-09
+
+Applied the verified findings of the over-engineering audit (4 direct dependencies, 4 files and 2 scripts removed). Working-tree checks after the change, before commit:
+
+| Command                                                                                            | Result                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`, `npm run typecheck`, `npm test` (3 tests), `npm run build`, `npm run format:check` | all exit 0                                                                                                                                                                                               |
+| `npm run db:validate` without a `.env` file (CI case)                                              | exit 0                                                                                                                                                                                                   |
+| `npm run db:migrate` with `.env` present                                                           | Prisma read `DATABASE_URL` through `process.loadEnvFile()` (datasource shown); the connection then failed with P1001 because Docker Desktop was stopped, so the full migrate run was **not** re-verified |
+| `next build` leaves `tsconfig.json` unchanged                                                      | yes, with the original `lib`/`allowJs` kept                                                                                                                                                              |
+
+Not verified: that `prisma/migrations` is Prisma 7's default migrations path (the explicit setting was kept), and a fresh-clone `npm ci` after this change (see next entry).

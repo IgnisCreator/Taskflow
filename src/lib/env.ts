@@ -8,9 +8,6 @@ const envSchema = z.object({
       (value) => /^postgres(ql)?:\/\//.test(value),
       "DATABASE_URL must be a PostgreSQL connection URL",
     ),
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
 });
 
 export type Env = z.infer<typeof envSchema>;

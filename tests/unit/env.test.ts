@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseEnv } from "@/lib/env";
+import { parseEnv } from "../../src/lib/env";
 
 describe("parseEnv", () => {
-  it("accepts a PostgreSQL URL and defaults NODE_ENV", () => {
-    const env = parseEnv({
-      DATABASE_URL: "postgresql://u:p@localhost:5432/db",
-    });
-    expect(env.NODE_ENV).toBe("development");
+  it("accepts a PostgreSQL URL", () => {
+    const url = "postgresql://u:p@localhost:5432/db";
+    expect(parseEnv({ DATABASE_URL: url }).DATABASE_URL).toBe(url);
   });
 
   it("rejects a missing DATABASE_URL", () => {
