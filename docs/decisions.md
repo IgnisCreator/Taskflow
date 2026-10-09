@@ -22,6 +22,8 @@ All dependency versions are pinned exactly (`--save-exact`, no ranges) and locke
 | eslint                                       | 9.39.5                                              | 2026-07-10 | Deliberately not 10.x (`latest`): `eslint-config-next@16.4.0` peers `eslint >=9` and its plugins were verified on 9 only |
 | eslint-config-next                           | 16.4.0                                              | 2026-10-06 |                                                                                                                          |
 | prettier                                     | 3.9.9                                               | 2026-09-23 | Default configuration (no `.prettierrc`); ignores come from `.gitignore`                                                 |
+| @dnd-kit/core                                | 6.3.1                                               | 2024-12-05 | Drag and drop for the board (ADR-007); brings `@dnd-kit/accessibility` and `@dnd-kit/utilities`                          |
+| @playwright/test                             | 1.64.0                                              | 2026-10-07 | End-to-end tests in a real browser; dev dependency                                                                       |
 | tailwindcss / @tailwindcss/postcss           | 4.3.3                                               | 2026-07-16 | Build-time only (dev dependencies); Tailwind 4 with the PostCSS plugin, as in its Next.js guide                          |
 | postcss                                      | 8.5.29                                              | 2026-10-05 | Required by `@tailwindcss/postcss`; pinned exactly                                                                       |
 | vitest                                       | 5.0.3                                               | 2026-09-30 | Needs `vite` as a non-optional peer                                                                                      |
@@ -31,7 +33,7 @@ All dependency versions are pinned exactly (`--save-exact`, no ranges) and locke
 
 Removed after the 2026-10-09 audit (no longer direct dependencies): `pg` and `@types/pg` (both are already dependencies of `@prisma/adapter-pg`, so the exact pin of `pg` is now resolved by the lockfile only), `dotenv` (replaced by Node's `process.loadEnvFile()` in `prisma.config.ts`) and `eslint-config-prettier` (0 conflicting active rules with ESLint 9; add it back with any stylistic ESLint plugin). Also removed: `next.config.ts` (empty; re-add for `output: "standalone"` in TF-08), `vitest.config.ts` (re-add with Playwright) and the `db:generate` and `db:migrate:dev` scripts (re-add `db:migrate:dev` in TF-03). `tsconfig.json` keeps `lib` and `allowJs` because `next build` rewrites them anyway.
 
-Deferred (not installed in TF-01): dnd-kit (ADR pending in TF-06), Playwright 1.64.0 (checked, installed with the E2E work), Better Auth (TF-02, see ADR-002).
+Deferred in TF-01 and installed later: Better Auth (TF-02, ADR-002), `@dnd-kit/core` and Playwright (TF-06, ADR-007).
 
 ### Prisma 7 consequences
 
@@ -146,3 +148,29 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - **Board snapshot:** `GET /api/projects/:id/board` reads project, members, ordered columns and tasks in one `REPEATABLE READ` transaction, so the data and `boardVersion` come from the same moment. All of it is returned (the 200-task limit makes pagination unnecessary); filters arrive in TF-07.
 - **UI:** four fixed columns; a task opens in a native `<dialog>` (focus trap and Esc from the platform) for create, edit, delete or read-only view. A 409 refreshes the board and keeps what the user typed; saving again repeats the intent with the new version. The delete confirmation is the `confirm` of the browser.
 - **ESLint:** `no-unused-vars` ignores rest siblings and names that start with an underscore, because dropping a key by destructuring is used deliberately.
+
+## ADR-007 — Moving tasks, drag and drop, polling and failure handling (TF-06)
+
+- **Date:** 2026-10-09
+- **Status:** accepted (TF-06)
+
+### Library choice (dnd-kit)
+
+`@dnd-kit/core` 6.3.1 only (no `@dnd-kit/sortable`): the stable line, its peers accept React 19, and the repository is active (last push 2026-09-12) although this package was last released in December 2024. `@dnd-kit/react` 0.5.0 exists but is pre-1.0. Pointer, touch (200 ms press) and keyboard sensors are enabled, and the screen-reader announcements use task and column names instead of ids. Not chosen: native HTML5 drag and drop (no touch support, accessibility would be hand-built).
+
+### Move rules
+
+- `PATCH /api/projects/:id/tasks/:taskId/move` with `{ columnId, toIndex, expectedBoardVersion }`. `toIndex` is the final index in the destination column **not counting the task itself**: 0 is first, the number of other tasks is last. Anything else is `400 INVALID_POSITION`; a column of another project is `400 INVALID_COLUMN`; a task of another project is `404`.
+- Under `withProjectLock`, positions stay 0..n-1 in both columns using ranged increments and decrements (there is no unique constraint on position, so there are no transient conflicts). The version goes up once.
+- A move that changes nothing throws inside the lock to roll back (version included) and answers 200 with the current state.
+- `src/lib/board-order.ts` is a pure model of the same move: the browser uses it for the optimistic update, and a randomised 60-move test checks the database against it after every step.
+- `GET /api/projects/:id/version` (any member, never cached) feeds the polling.
+
+### Behaviour of the board
+
+- **Optimistic with rollback.** The order changes at once, with one move in flight at a time. The optimistic order only counts while the server data it was built from is still current, so a refresh replaces it without an effect. On any failure it is dropped.
+- **Refresh only when the server answered.** After a conflict, an error response or a success the page refreshes. After a failure with no response at all (offline) it does **not**: the refresh would fail and Next would reload the whole page, leaving the browser error page. An end-to-end test that cuts the connection found this.
+- **Polling.** Every 10 s while the tab is visible, and on focus or on becoming visible, the board reads the version and refreshes if it changed (a short notice says so). It pauses while a move is in flight.
+- **Dialogs keep their own version.** A dialog saves with the version from when it opened. If the board changed meanwhile, the server answers 409, the typed text stays, the dialog adopts the current version, and a second save repeats the intent knowingly (nothing is overwritten silently).
+- **Accessible alternative to dragging.** The task dialog has "Column" and "Position" selects and a "Move" button.
+- **End-to-end tests** (`npm run test:e2e`) run against a production build on port 3100 with sessions created by test-only helpers (`tests/e2e/fixtures.ts`; secret and database in `tests/e2e/env.ts`). In CI they run after the build against the service database, after `npx playwright install --with-deps chromium`.

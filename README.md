@@ -42,14 +42,15 @@ npm run dev                  # http://localhost:3000
 
 ## Scripts
 
-| Command                | Purpose                    |
-| ---------------------- | -------------------------- |
-| `npm run lint`         | ESLint                     |
-| `npm run format:check` | Prettier check             |
-| `npm run typecheck`    | TypeScript (no emit)       |
-| `npm test`             | Unit tests (Vitest)        |
-| `npm run db:validate`  | Validate the Prisma schema |
-| `npm run build`        | Production build           |
+| Command                | Purpose                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| `npm run lint`         | ESLint                                                                                                  |
+| `npm run format:check` | Prettier check                                                                                          |
+| `npm run typecheck`    | TypeScript (no emit)                                                                                    |
+| `npm test`             | Unit and integration tests (Vitest); needs PostgreSQL running and migrated                              |
+| `npm run db:validate`  | Validate the Prisma schema                                                                              |
+| `npm run build`        | Production build                                                                                        |
+| `npm run test:e2e`     | Browser tests (Playwright); needs a build and PostgreSQL. First time: `npx playwright install chromium` |
 
 ## SQL and indexes
 
