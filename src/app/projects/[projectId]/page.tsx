@@ -22,6 +22,11 @@ export default async function ProjectPage({
       <h1>{project.name}</h1>
       {project.description && <p>{project.description}</p>}
       <p>Your role: {project.isOwner ? "owner" : project.role}</p>
+      <p>
+        <Link href={`/projects/${project.id}/settings`}>
+          Settings and members
+        </Link>
+      </p>
       <p>The board arrives in a later milestone.</p>
     </main>
   );

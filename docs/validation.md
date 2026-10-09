@@ -134,3 +134,27 @@ Mutation checks (each made one test fail, then reverted): delete without the ver
 Live check (production build, session created with the test helpers): anonymous `/projects` and `/projects/<id>` redirect (307) to `/login` and `/api/projects` returns 401; signed in, `/projects` (200) lists the project and the creation form, `/projects/<id>` (200) shows its name and description, an unknown id is 404. The test data was removed afterwards.
 
 Not covered yet: the browser flow of the creation form (no end-to-end test until Playwright), rate limiting, and the manual real GitHub login of TF-02.
+
+## TF-04 — members, settings and the permission matrix, 2026-10-09 (branch `tf-04/members`)
+
+Checks without `.env`, with the CI placeholder variables, against the Compose PostgreSQL: `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate`, `npm test` (7 files, 144 tests) and `build` (adds `/projects/[projectId]/settings`, `/api/projects/[projectId]/members` and `/members/[userId]`) all exit 0.
+
+| Acceptance criterion (plan)                                       | Evidence                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registered collaborator can access                                | "gives the new member access and never exposes emails or public IDs"                                                                                                                                                                                          |
+| VIEWER cannot write                                               | matrix: PATCH/DELETE project, POST/PATCH/DELETE members → 403 for viewer (and member)                                                                                                                                                                         |
+| ADMIN cannot raise to ADMIN                                       | matrix: "POST member as ADMIN", "PATCH member to ADMIN", "PATCH an ADMIN down", "DELETE an ADMIN" → 403 for admin, 2xx for owner                                                                                                                              |
+| Removal un-assigns tasks and revokes access                       | "un-assigns their tasks, keeps the author, and ends their access" (the removed user's old session gets 404)                                                                                                                                                   |
+| Full matrix, all routes × actors, DB unchanged on every rejection | `tests/integration/permissions-matrix.test.ts`: 14 routes × 6 callers (owner, admin, member, viewer, stranger, anonymous) = 84 cases, plus a cross-project target; each rejected request is checked against a snapshot of project, members, tasks and columns |
+
+Also covered: unknown or malformed `publicId`, `OWNER` as a role, unexpected fields, duplicate member, the five-member limit, stale versions on rename/add/change/remove (409, nothing changes), two writes with the same version (one wins, one 409, version +1), a demotion that committed first is honoured, project PATCH trimming and clearing the description, and the policy tables (`tests/unit/policies.test.ts`).
+
+Mutation checks (each made tests fail, then reverted): ADMIN allowed to touch ADMINs (8 failures), removal without un-assigning tasks (3), the lock open to non-members (12), no version check (5).
+
+Browser walkthrough (production build, test session injected as a cookie, built-in browser): the settings page renders; renaming shows "Saved." and the version rises; adding the guest by public ID lists them; changing their role to Viewer persists (confirmed in the database); removing them leaves only the owner; deleting the project with the typed name redirects to `/projects`; the creation form creates a project and opens it. All test data was removed afterwards.
+
+Known limits: the pages are unstyled (UI work comes later), there is no end-to-end test in CI yet (Playwright), and rate limiting is still pending.
+
+## First CI run on GitHub — 2026-10-09
+
+Commit `d33c994` (first push). The run **failed in "Initialize containers"** with "Docker pull failed with exit code 1" (retried three times) before any workflow step ran, so lint, tests and build have still **not** run on GitHub. `postgres:18.6` exists (`docker manifest inspect`). Cause not confirmed; to be re-checked on the next push.
