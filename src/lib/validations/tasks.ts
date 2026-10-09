@@ -49,3 +49,12 @@ export const updateTaskSchema = z
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+
+// Moving: the destination column and the final index there (0 = first), without counting the task.
+export const moveTaskSchema = z.strictObject({
+  columnId: z.string().min(1).max(100),
+  toIndex: z.number().int().min(0),
+  expectedBoardVersion,
+});
+
+export type MoveTaskInput = z.infer<typeof moveTaskSchema>;

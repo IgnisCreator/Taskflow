@@ -14,42 +14,58 @@ export type TaskView = {
   dueDate: string | null;
 };
 
+export type ColumnView = { id: string; name: string; tasks: TaskView[] };
 export type MemberView = { userId: string; name: string };
 
+/** `version` is the board version the user was looking at when the dialog opened. */
 export type DialogState =
-  | { mode: "create"; columnId: string; columnName: string; draftId: string }
-  | { mode: "edit"; task: TaskView };
+  | {
+      mode: "create";
+      columnId: string;
+      columnName: string;
+      draftId: string;
+      version: number;
+    }
+  | { mode: "edit"; task: TaskView; version: number };
 
 /**
- * Create / edit / read a task in a native <dialog> (focus trap and Esc come from the platform).
- * `key` on the form resets the fields whenever another task is opened. The version is read from
- * props at submit time, so after a 409 the board refreshes and a second save repeats the intent.
+ * Create / edit / move / read a task in a native <dialog> (focus trap and Esc come from the platform).
+ *
+ * Saves use the version from when the dialog opened, not the latest one: if the board changed while
+ * the form was open, the server answers 409, the typed text is kept, the dialog adopts the current
+ * version, and a second save repeats the user's intent knowingly.
  */
 export function TaskDialog({
   projectId,
-  boardVersion,
+  columns,
   members,
   canWrite,
+  busy,
   state,
+  onMove,
   onClose,
 }: {
   projectId: string;
-  boardVersion: number;
+  columns: ColumnView[];
   members: MemberView[];
   canWrite: boolean;
+  busy: boolean;
   state: DialogState | null;
+  onMove: (taskId: string, columnId: string, toIndex: number) => void;
   onClose: () => void;
 }) {
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [adoptedVersion, setAdoptedVersion] = useState<number | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     if (state && !dialog.open) {
       setError(null);
+      setAdoptedVersion(null);
       dialog.showModal();
     }
     if (!state && dialog.open) dialog.close();
@@ -57,6 +73,19 @@ export function TaskDialog({
 
   const task = state?.mode === "edit" ? state.task : null;
   const readOnly = !canWrite;
+  const version = adoptedVersion ?? state?.version ?? 0;
+
+  function fail(result: Awaited<ReturnType<typeof api>> & { ok: false }) {
+    if (result.conflict) {
+      if (result.currentVersion !== undefined)
+        setAdoptedVersion(result.currentVersion);
+      setError(
+        "The project changed while this was open. Your changes are still here; check the board and save again.",
+      );
+    } else {
+      setError(result.message);
+    }
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,7 +97,7 @@ export function TaskDialog({
       priority: form.get("priority"),
       assigneeId: form.get("assigneeId") || null,
       dueDate: form.get("dueDate") || null,
-      expectedBoardVersion: boardVersion,
+      expectedBoardVersion: version,
     };
     setPending(true);
     setError(null);
@@ -85,9 +114,9 @@ export function TaskDialog({
             fields,
           );
     setPending(false);
-    router.refresh();
+    if (result.ok || !result.network) router.refresh(); // not when the server was unreachable
     if (result.ok) onClose();
-    else setError(result.message);
+    else fail(result);
   }
 
   async function onDelete() {
@@ -97,12 +126,12 @@ export function TaskDialog({
     const result = await api(
       "DELETE",
       `/api/projects/${projectId}/tasks/${task.id}`,
-      { expectedBoardVersion: boardVersion },
+      { expectedBoardVersion: version },
     );
     setPending(false);
-    router.refresh();
+    if (result.ok || !result.network) router.refresh(); // not when the server was unreachable
     if (result.ok) onClose();
-    else setError(result.message);
+    else fail(result);
   }
 
   const heading =
@@ -191,6 +220,17 @@ export function TaskDialog({
               className="input"
             />
           </label>
+          {canWrite && task && (
+            <MoveControls
+              task={task}
+              columns={columns}
+              disabled={busy || pending}
+              onMove={(columnId, toIndex) => {
+                onMove(task.id, columnId, toIndex);
+                onClose();
+              }}
+            />
+          )}
           {error && (
             <p role="alert" className="error">
               {error}
@@ -219,5 +259,80 @@ export function TaskDialog({
         </form>
       )}
     </dialog>
+  );
+}
+
+/** The keyboard- and screen-reader-friendly way to move a task: pick a column and a position. */
+function MoveControls({
+  task,
+  columns,
+  disabled,
+  onMove,
+}: {
+  task: TaskView;
+  columns: ColumnView[];
+  disabled: boolean;
+  onMove: (columnId: string, toIndex: number) => void;
+}) {
+  const current = columns.find((c) => c.id === task.columnId);
+  const currentIndex = current?.tasks.findIndex((t) => t.id === task.id) ?? 0;
+  const [columnId, setColumnId] = useState(task.columnId);
+  const [toIndex, setToIndex] = useState(currentIndex);
+
+  const target = columns.find((c) => c.id === columnId);
+  const others = (target?.tasks ?? []).filter((t) => t.id !== task.id).length;
+  const unchanged = columnId === task.columnId && toIndex === currentIndex;
+
+  return (
+    <fieldset className="space-y-3 border-t border-line pt-4">
+      <legend className="font-medium">Move task</legend>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="field">
+          Column
+          <select
+            value={columnId}
+            className="input"
+            onChange={(event) => {
+              setColumnId(event.target.value);
+              // Moving to another column starts at the end; staying keeps the position.
+              setToIndex(
+                event.target.value === task.columnId
+                  ? currentIndex
+                  : (columns.find((c) => c.id === event.target.value)?.tasks
+                      .length ?? 0),
+              );
+            }}
+          >
+            {columns.map((column) => (
+              <option key={column.id} value={column.id}>
+                {column.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Position
+          <select
+            value={toIndex}
+            className="input"
+            onChange={(event) => setToIndex(Number(event.target.value))}
+          >
+            {Array.from({ length: others + 1 }, (_, index) => (
+              <option key={index} value={index}>
+                {index + 1}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <button
+        type="button"
+        className="btn-secondary"
+        disabled={disabled || unchanged}
+        onClick={() => onMove(columnId, toIndex)}
+      >
+        Move
+      </button>
+    </fieldset>
   );
 }

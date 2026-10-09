@@ -15,6 +15,9 @@ const board = await import("@/app/api/projects/[projectId]/board/route");
 const tasks = await import("@/app/api/projects/[projectId]/tasks/route");
 const task =
   await import("@/app/api/projects/[projectId]/tasks/[taskId]/route");
+const move =
+  await import("@/app/api/projects/[projectId]/tasks/[taskId]/move/route");
+const version = await import("@/app/api/projects/[projectId]/version/route");
 const { db } = await import("@/server/db");
 
 const BASE = "http://localhost:3000";
@@ -110,6 +113,28 @@ const onNewTask: Call = async ({ actor, projectId }) => {
       expectedBoardVersion: 0,
     }),
     { projectId },
+  );
+};
+
+const onVersion: Call = ({ actor, projectId }) =>
+  callAs(actor, version.GET, send("GET", url(projectId, "/version")), {
+    projectId,
+  });
+
+// Moves the fixture task to the front of the second column, so a success always changes state.
+const onMove: Call = async ({ actor, projectId, taskId }) => {
+  const column = await db.boardColumn.findFirstOrThrow({
+    where: { projectId, position: 1 },
+  });
+  return callAs(
+    actor,
+    move.PATCH,
+    send("PATCH", url(projectId, `/tasks/${taskId}/move`), {
+      columnId: column.id,
+      toIndex: 0,
+      expectedBoardVersion: 0,
+    }),
+    { projectId, taskId },
   );
 };
 
@@ -235,6 +260,8 @@ const matrix: [string, Call, number[]][] = [
   ],
   // Tasks: owner, admin and member write; a viewer only reads.
   ["GET board", onBoard, [200, 200, 200, 200, 404, 401]],
+  ["GET version", onVersion, [200, 200, 200, 200, 404, 401]],
+  ["PATCH move task", onMove, [200, 200, 200, 403, 404, 401]],
   ["POST task", onNewTask, [201, 201, 201, 403, 404, 401]],
   [
     "PATCH task",

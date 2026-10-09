@@ -1,4 +1,13 @@
-type Failure = { ok: false; message: string; conflict: boolean };
+type Failure = {
+  ok: false;
+  message: string;
+  /** True for BOARD_CONFLICT: someone else changed the project first. */
+  conflict: boolean;
+  /** The server's current board version, present on a conflict. */
+  currentVersion?: number;
+  /** True when no response arrived (offline, aborted): the server was not reached. */
+  network?: boolean;
+};
 type Success = { ok: true; data: unknown };
 
 /** Browser-side JSON call to our API. Same-origin fetches carry the Origin header the server requires. */
@@ -22,6 +31,7 @@ export async function api(
     return {
       ok: false,
       conflict,
+      currentVersion: payload.error?.currentVersion,
       message: conflict
         ? "The project changed in the meantime. The page was refreshed; try again."
         : String(field ?? payload.error?.message ?? "Something went wrong"),
@@ -30,6 +40,7 @@ export async function api(
     return {
       ok: false,
       conflict: false,
+      network: true,
       message: "Could not reach the server. Check your connection and retry.",
     };
   }

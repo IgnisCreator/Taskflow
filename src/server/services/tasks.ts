@@ -1,7 +1,11 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { MAX_TASKS } from "@/lib/validations/tasks";
-import type { CreateTaskInput, UpdateTaskInput } from "@/lib/validations/tasks";
+import type {
+  CreateTaskInput,
+  MoveTaskInput,
+  UpdateTaskInput,
+} from "@/lib/validations/tasks";
 import { db } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { can } from "@/server/policies";
@@ -284,4 +288,111 @@ export async function deleteTask(
       });
     },
   );
+}
+
+/** Thrown inside the lock to roll everything back, version bump included, when nothing would change. */
+class NoChange extends Error {}
+
+/**
+ * Moves a task to `columnId` at `toIndex` (its final index there, not counting the task) and keeps
+ * positions 0..n-1 in both columns. Everything happens under the project lock, so the version goes
+ * up once and two moves with the same version cannot both succeed. A move that changes nothing
+ * rolls back and answers with the current state.
+ */
+export async function moveTask(
+  userId: string,
+  projectId: string,
+  taskId: string,
+  { expectedBoardVersion, columnId, toIndex }: MoveTaskInput,
+) {
+  try {
+    const { result, boardVersion } = await withProjectLock(
+      userId,
+      projectId,
+      expectedBoardVersion,
+      "task:write",
+      async (tx) => {
+        const task = await tx.task.findFirst({
+          where: { id: taskId, projectId },
+          select: { columnId: true, position: true },
+        });
+        if (!task) throw notFound();
+        const column = await tx.boardColumn.findFirst({
+          where: { id: columnId, projectId },
+          select: { id: true },
+        });
+        if (!column)
+          throw invalid(
+            "INVALID_COLUMN",
+            "The column is not part of this project",
+          );
+
+        const sameColumn = task.columnId === column.id;
+        const inColumn = await tx.task.count({
+          where: { projectId, columnId: column.id },
+        });
+        const last = sameColumn ? inColumn - 1 : inColumn;
+        if (toIndex > last) {
+          throw invalid(
+            "INVALID_POSITION",
+            `The position must be between 0 and ${last}`,
+          );
+        }
+        if (sameColumn && toIndex === task.position) throw new NoChange();
+
+        if (sameColumn && toIndex > task.position) {
+          await tx.task.updateMany({
+            where: {
+              projectId,
+              columnId: column.id,
+              position: { gt: task.position, lte: toIndex },
+            },
+            data: { position: { decrement: 1 } },
+          });
+        } else if (sameColumn) {
+          await tx.task.updateMany({
+            where: {
+              projectId,
+              columnId: column.id,
+              position: { gte: toIndex, lt: task.position },
+            },
+            data: { position: { increment: 1 } },
+          });
+        } else {
+          await tx.task.updateMany({
+            where: {
+              projectId,
+              columnId: task.columnId,
+              position: { gt: task.position },
+            },
+            data: { position: { decrement: 1 } },
+          });
+          await tx.task.updateMany({
+            where: {
+              projectId,
+              columnId: column.id,
+              position: { gte: toIndex },
+            },
+            data: { position: { increment: 1 } },
+          });
+        }
+        return tx.task.update({
+          where: { id: taskId },
+          data: { columnId: column.id, position: toIndex },
+          select: taskSelect,
+        });
+      },
+    );
+    return { task: toTask(result), boardVersion };
+  } catch (error) {
+    if (!(error instanceof NoChange)) throw error;
+    const [task, project] = await Promise.all([
+      db.task.findUniqueOrThrow({ where: { id: taskId }, select: taskSelect }),
+      db.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { boardVersion: true },
+      }),
+    ]);
+    return { task: toTask(task), boardVersion: project.boardVersion };
+  }
 }

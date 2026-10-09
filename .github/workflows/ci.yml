@@ -16,7 +16,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # Ephemeral database for migrations and integration tests; never a real one.
     services:
       postgres:
@@ -67,3 +67,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      # Real browser against the production build; it uses the same service database.
+      - name: Install the Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run test:e2e
