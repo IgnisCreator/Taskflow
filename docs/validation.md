@@ -112,3 +112,5 @@ The tests were mutation-checked: disabling logout, or turning token encryption o
 Live check with the real `.env` (production build, no login completed): `/login` 200; `/profile` without cookie 307 to `/login`; `/api/me` 401; the GitHub authorize URL carries `redirect_uri=http://localhost:3000/api/auth/callback/github`, scope `read:user user:email` and a `state`.
 
 TF-01 gap closed here: the pull request template (`.github/pull_request_template.md`) was missing from TF-01.
+
+Clean clone of commit `f48466a` (branch `tf-02/auth`) against a fresh PostgreSQL volume, with CI-style placeholder variables and no `.env`: `npm ci`, `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate` (applied the migration from an empty database), `npm test` (13 passed) and `build` all exit 0. A scan of every commit found none of the secret values from the local `.env`.
