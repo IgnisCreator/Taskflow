@@ -17,7 +17,7 @@ export default async function ProjectPage({
   return (
     <main className="space-y-6">
       <p className="text-sm">
-        <Link href="/projects" className="text-indigo-700 hover:underline">
+        <Link href="/projects" className="link">
           &larr; All projects
         </Link>
       </p>
@@ -25,7 +25,7 @@ export default async function ProjectPage({
         <div>
           <h1 className="text-2xl font-semibold">{project.name}</h1>
           {project.description && (
-            <p className="mt-1 text-slate-600">{project.description}</p>
+            <p className="mt-1 text-muted">{project.description}</p>
           )}
         </div>
         <span className="badge">
@@ -40,9 +40,7 @@ export default async function ProjectPage({
           Settings and members
         </Link>
       </p>
-      <p className="card text-slate-600">
-        The board arrives in a later milestone.
-      </p>
+      <p className="card text-muted">The board arrives in a later milestone.</p>
     </main>
   );
 }

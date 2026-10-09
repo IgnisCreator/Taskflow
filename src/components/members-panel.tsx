@@ -58,7 +58,7 @@ export function MembersPanel({
   return (
     <section className="card space-y-4">
       <h2 className="text-lg font-semibold">Members</h2>
-      <ul className="divide-y divide-slate-200">
+      <ul className="divide-y divide-line">
         {members.map((member) => {
           const manageable = (to?: Role) =>
             canManageMember(actor, {
@@ -126,12 +126,9 @@ export function MembersPanel({
       </ul>
 
       {canManage && (
-        <form
-          onSubmit={onAdd}
-          className="space-y-4 border-t border-slate-200 pt-4"
-        >
+        <form onSubmit={onAdd} className="space-y-4 border-t border-line pt-4">
           <h3 className="font-medium">Add a member</h3>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Ask the person to sign in and copy the public ID from their profile.
             They get access immediately.
           </p>

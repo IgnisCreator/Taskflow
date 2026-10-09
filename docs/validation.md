@@ -172,3 +172,11 @@ The owner signed in with GitHub on the local development server and created the 
 Not covered: contrast and keyboard-order audits, other browsers, the project page and profile on mobile.
 
 Process note: from this point validation clones use a separate database (not `docker compose down -v`), because the development database now holds real data.
+
+## Design system and dark theme, 2026-10-09 (branch `ui/design-system`)
+
+Contrast was computed before choosing the values: every pair passed on the first selection. After the change: `lint`, `format:check`, `typecheck`, `npm test` (195 tests, 8 files) and `build` pass; the 51 new tests cover token parity, Tailwind exposure and contrast in both themes. Mutation checks: making one dark copy differ, or lightening the control border, makes the matching tests fail. The new CI guard rejects raw colours (it flags a planted `bg-indigo-600`).
+
+Browser check (production build, test session): with no cookie the page follows the system (the pane's system theme is dark, shown as "Theme: Auto"); the button cycles to Light and the choice survives a reload, rendered by the server (`data-theme="light"` in the HTML, none for Auto); Dark renders cards, inputs, the primary button, and the red delete zone readably. Test data was removed; the owner's real project was untouched.
+
+Not covered: a screen-reader pass, touch-target size, other browsers, and the board (not built yet).

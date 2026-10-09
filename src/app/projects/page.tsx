@@ -14,7 +14,7 @@ export default async function ProjectsPage() {
     <main className="space-y-8">
       <h1 className="text-2xl font-semibold">Projects</h1>
       {items.length === 0 ? (
-        <p className="card text-slate-600">
+        <p className="card text-muted">
           You have no projects yet. Create the first one below.
         </p>
       ) : (
@@ -23,7 +23,7 @@ export default async function ProjectsPage() {
             <li key={project.id}>
               <Link
                 href={`/projects/${project.id}`}
-                className="card block hover:border-indigo-300"
+                className="card block hover:border-primary"
               >
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-medium">{project.name}</span>
@@ -32,7 +32,7 @@ export default async function ProjectsPage() {
                   </span>
                 </span>
                 {project.description && (
-                  <span className="mt-1 line-clamp-2 block text-sm text-slate-600">
+                  <span className="mt-1 line-clamp-2 block text-sm text-muted">
                     {project.description}
                   </span>
                 )}

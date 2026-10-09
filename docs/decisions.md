@@ -121,9 +121,10 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - Member responses never include email, `publicId` or tokens.
 - The settings UI hides controls the caller cannot use with the same `canManageMember`; the server remains the only authority.
 
-## ADR-005 — Visual layer (2026-10-09)
+## ADR-005 — Visual layer and design system (2026-10-09)
 
-- Tailwind CSS 4 is the only styling tool. Repeated patterns live as a few classes in `src/app/globals.css` (`btn`, `btn-secondary`, `btn-danger`, `field`, `input`, `card`, `badge`, `error`, `notice`); everything else is utility classes in the components. No component library.
-- Light theme only (dark mode is outside version 1). The layout provides a skip link, a labelled main navigation, and visible keyboard focus on every control.
-- Mobile first: single column below `sm`, no horizontal scroll at 375 px.
-- Deeper UI work (board, keyboard drag alternatives, empty and error states) stays in TF-06 and TF-07.
+- Tailwind CSS 4 is the only styling tool; no component library. The full guide is `docs/design.md`.
+- **Four colours by role** (Neutral, Primary, Danger, Success), defined once as CSS variables in `src/app/globals.css` and exposed to Tailwind through `@theme inline`. Pages use roles (`bg-surface`, `text-muted`, `border-line`) and a small set of shared classes (`btn`, `btn-secondary`, `btn-danger`, `field`, `input`, `card`, `card-danger`, `badge`, `link`, `error`, `notice`); no raw Tailwind colours and no `dark:` variants.
+- **Dark theme is now in scope.** The original plan left it out of version 1; the owner asked for it on 2026-10-09. It follows the system by default; a header button cycles Auto, Light and Dark and stores the choice in a `theme` cookie that the server renders as `data-theme` on `<html>` (no flash, no inline script). Consequence: the root layout reads cookies, so every route renders dynamically, which is acceptable for an authenticated app.
+- **Enforced, not just documented:** a unit test checks WCAG AA contrast for 19 text pairs and 5 control pairs in both themes and that both copies of the dark values match; a CI step rejects raw colour classes in `src/`.
+- Mobile first, light and dark, no horizontal scroll at 375 px. Deeper UI work (board, keyboard alternatives to drag, empty and error states, touch-target audit) stays in TF-06 and TF-07.
