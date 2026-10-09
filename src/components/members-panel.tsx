@@ -56,9 +56,9 @@ export function MembersPanel({
   }
 
   return (
-    <section>
-      <h2>Members</h2>
-      <ul>
+    <section className="card space-y-4">
+      <h2 className="text-lg font-semibold">Members</h2>
+      <ul className="divide-y divide-slate-200">
         {members.map((member) => {
           const manageable = (to?: Role) =>
             canManageMember(actor, {
@@ -67,84 +67,96 @@ export function MembersPanel({
               targetIsOwner: member.isOwner,
             });
           return (
-            <li key={member.userId}>
-              {member.name}{" "}
-              {manageable("MEMBER") ? (
-                <select
-                  aria-label={`Role of ${member.name}`}
-                  value={member.role}
-                  disabled={pending}
-                  onChange={(event) =>
-                    run(() =>
-                      api("PATCH", `${base}/${member.userId}`, {
-                        role: event.target.value,
-                        expectedBoardVersion: boardVersion,
-                      }),
-                    )
-                  }
-                >
-                  {actor.isOwner && <option value="ADMIN">Admin</option>}
-                  <option value="MEMBER">Member</option>
-                  <option value="VIEWER">Viewer</option>
-                </select>
-              ) : (
-                <small>({member.isOwner ? "owner" : member.role})</small>
-              )}{" "}
-              {manageable() && (
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `Remove ${member.name}? Their tasks become unassigned.`,
-                      )
-                    ) {
-                      void run(() =>
-                        api("DELETE", `${base}/${member.userId}`, {
+            <li
+              key={member.userId}
+              className="flex flex-wrap items-center justify-between gap-2 py-2"
+            >
+              <span className="font-medium">{member.name}</span>
+              <span className="flex items-center gap-2">
+                {manageable("MEMBER") ? (
+                  <select
+                    aria-label={`Role of ${member.name}`}
+                    value={member.role}
+                    disabled={pending}
+                    className="input mt-0 w-auto"
+                    onChange={(event) =>
+                      run(() =>
+                        api("PATCH", `${base}/${member.userId}`, {
+                          role: event.target.value,
                           expectedBoardVersion: boardVersion,
                         }),
-                      );
+                      )
                     }
-                  }}
-                >
-                  Remove {member.name}
-                </button>
-              )}
+                  >
+                    {actor.isOwner && <option value="ADMIN">Admin</option>}
+                    <option value="MEMBER">Member</option>
+                    <option value="VIEWER">Viewer</option>
+                  </select>
+                ) : (
+                  <span className="badge">
+                    {member.isOwner ? "owner" : member.role}
+                  </span>
+                )}
+                {manageable() && (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="btn-secondary"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Remove ${member.name}? Their tasks become unassigned.`,
+                        )
+                      ) {
+                        void run(() =>
+                          api("DELETE", `${base}/${member.userId}`, {
+                            expectedBoardVersion: boardVersion,
+                          }),
+                        );
+                      }
+                    }}
+                  >
+                    Remove {member.name}
+                  </button>
+                )}
+              </span>
             </li>
           );
         })}
       </ul>
 
       {canManage && (
-        <form onSubmit={onAdd}>
-          <h3>Add a member</h3>
-          <p>
+        <form
+          onSubmit={onAdd}
+          className="space-y-4 border-t border-slate-200 pt-4"
+        >
+          <h3 className="font-medium">Add a member</h3>
+          <p className="text-sm text-slate-600">
             Ask the person to sign in and copy the public ID from their profile.
             They get access immediately.
           </p>
-          <p>
-            <label>
-              Public ID
-              <input name="publicId" required />
-            </label>
-          </p>
-          <p>
-            <label>
-              Role
-              <select name="role" defaultValue="MEMBER">
-                {actor.isOwner && <option value="ADMIN">Admin</option>}
-                <option value="MEMBER">Member</option>
-                <option value="VIEWER">Viewer</option>
-              </select>
-            </label>
-          </p>
-          <button type="submit" disabled={pending}>
+          <label className="field">
+            Public ID
+            <input name="publicId" required className="input" />
+          </label>
+          <label className="field">
+            Role
+            <select name="role" defaultValue="MEMBER" className="input">
+              {actor.isOwner && <option value="ADMIN">Admin</option>}
+              <option value="MEMBER">Member</option>
+              <option value="VIEWER">Viewer</option>
+            </select>
+          </label>
+          <button type="submit" disabled={pending} className="btn">
             Add member
           </button>
         </form>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

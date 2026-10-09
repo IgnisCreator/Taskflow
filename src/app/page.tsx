@@ -2,12 +2,15 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main>
-      <h1>TaskFlow</h1>
-      <p>Collaborative Kanban project manager.</p>
+    <main className="space-y-4">
+      <h1 className="text-3xl font-bold tracking-tight">TaskFlow</h1>
+      <p className="text-slate-600">
+        A collaborative Kanban project manager for small teams.
+      </p>
       <p>
-        <Link href="/projects">Projects</Link> ·{" "}
-        <Link href="/profile">Profile</Link>
+        <Link href="/projects" className="btn">
+          Go to your projects
+        </Link>
       </p>
     </main>
   );

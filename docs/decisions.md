@@ -22,6 +22,8 @@ All dependency versions are pinned exactly (`--save-exact`, no ranges) and locke
 | eslint                                       | 9.39.5                                              | 2026-07-10 | Deliberately not 10.x (`latest`): `eslint-config-next@16.4.0` peers `eslint >=9` and its plugins were verified on 9 only |
 | eslint-config-next                           | 16.4.0                                              | 2026-10-06 |                                                                                                                          |
 | prettier                                     | 3.9.9                                               | 2026-09-23 | Default configuration (no `.prettierrc`); ignores come from `.gitignore`                                                 |
+| tailwindcss / @tailwindcss/postcss           | 4.3.3                                               | 2026-07-16 | Build-time only (dev dependencies); Tailwind 4 with the PostCSS plugin, as in its Next.js guide                          |
+| postcss                                      | 8.5.29                                              | 2026-10-05 | Required by `@tailwindcss/postcss`; pinned exactly                                                                       |
 | vitest                                       | 5.0.3                                               | 2026-09-30 | Needs `vite` as a non-optional peer                                                                                      |
 | vite                                         | 8.3.3                                               | 2026-10-06 | Pinned explicitly because `vitest@5.0.3` requires it (peer `^6.4 \|\| ^7 \|\| ^8`)                                       |
 | @types/node                                  | 24.19.1                                             | 2026-10-01 | Matches Node 24                                                                                                          |
@@ -29,7 +31,7 @@ All dependency versions are pinned exactly (`--save-exact`, no ranges) and locke
 
 Removed after the 2026-10-09 audit (no longer direct dependencies): `pg` and `@types/pg` (both are already dependencies of `@prisma/adapter-pg`, so the exact pin of `pg` is now resolved by the lockfile only), `dotenv` (replaced by Node's `process.loadEnvFile()` in `prisma.config.ts`) and `eslint-config-prettier` (0 conflicting active rules with ESLint 9; add it back with any stylistic ESLint plugin). Also removed: `next.config.ts` (empty; re-add for `output: "standalone"` in TF-08), `vitest.config.ts` (re-add with Playwright) and the `db:generate` and `db:migrate:dev` scripts (re-add `db:migrate:dev` in TF-03). `tsconfig.json` keeps `lib` and `allowJs` because `next build` rewrites them anyway.
 
-Deferred (not installed in TF-01): Tailwind CSS, dnd-kit (ADR pending in TF-06), Playwright 1.64.0 (checked, installed with the E2E work), Better Auth (TF-02, see ADR-002).
+Deferred (not installed in TF-01): dnd-kit (ADR pending in TF-06), Playwright 1.64.0 (checked, installed with the E2E work), Better Auth (TF-02, see ADR-002).
 
 ### Prisma 7 consequences
 
@@ -118,3 +120,10 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - Removing a member un-assigns their tasks in the same transaction (the composite foreign key is `NO ACTION`, so removal would fail otherwise); authorship (`createdById`) is kept.
 - Member responses never include email, `publicId` or tokens.
 - The settings UI hides controls the caller cannot use with the same `canManageMember`; the server remains the only authority.
+
+## ADR-005 — Visual layer (2026-10-09)
+
+- Tailwind CSS 4 is the only styling tool. Repeated patterns live as a few classes in `src/app/globals.css` (`btn`, `btn-secondary`, `btn-danger`, `field`, `input`, `card`, `badge`, `error`, `notice`); everything else is utility classes in the components. No component library.
+- Light theme only (dark mode is outside version 1). The layout provides a skip link, a labelled main navigation, and visible keyboard focus on every control.
+- Mobile first: single column below `sm`, no horizontal scroll at 375 px.
+- Deeper UI work (board, keyboard drag alternatives, empty and error states) stays in TF-06 and TF-07.

@@ -8,6 +8,7 @@ export function LogoutButton() {
   return (
     <button
       type="button"
+      className="btn-secondary"
       onClick={() =>
         authClient.signOut({
           fetchOptions: { onSuccess: () => router.push("/login") },

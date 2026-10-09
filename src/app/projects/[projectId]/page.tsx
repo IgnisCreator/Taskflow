@@ -15,19 +15,34 @@ export default async function ProjectPage({
   if (!project) notFound();
 
   return (
-    <main>
-      <p>
-        <Link href="/projects">All projects</Link>
+    <main className="space-y-6">
+      <p className="text-sm">
+        <Link href="/projects" className="text-indigo-700 hover:underline">
+          &larr; All projects
+        </Link>
       </p>
-      <h1>{project.name}</h1>
-      {project.description && <p>{project.description}</p>}
-      <p>Your role: {project.isOwner ? "owner" : project.role}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{project.name}</h1>
+          {project.description && (
+            <p className="mt-1 text-slate-600">{project.description}</p>
+          )}
+        </div>
+        <span className="badge">
+          {project.isOwner ? "owner" : project.role}
+        </span>
+      </div>
       <p>
-        <Link href={`/projects/${project.id}/settings`}>
+        <Link
+          href={`/projects/${project.id}/settings`}
+          className="btn-secondary"
+        >
           Settings and members
         </Link>
       </p>
-      <p>The board arrives in a later milestone.</p>
+      <p className="card text-slate-600">
+        The board arrives in a later milestone.
+      </p>
     </main>
   );
 }

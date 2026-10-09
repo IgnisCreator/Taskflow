@@ -160,3 +160,15 @@ Known limits: the pages are unstyled (UI work comes later), there is no end-to-e
 Commit `d33c994` (first push). The run **failed in "Initialize containers"** with "Docker pull failed with exit code 1" (retried three times) before any workflow step ran, so lint, tests and build have still **not** run on GitHub. `postgres:18.6` exists (`docker manifest inspect`). Cause not confirmed; to be re-checked on the next push.
 
 **Update, same day:** the next push (`6f21a2d`, merge of TF-04) ran green on GitHub Actions in 53 s: all 13 steps succeeded, including lint, formatting, typecheck, Prisma validation, the test-helper guard, migrations against the service PostgreSQL, the 144 tests and the build (https://github.com/IgnisCreator/Taskflow/actions/runs/37996388559). The earlier failure was a transient image pull problem; nothing in the workflow changed. This closes the open item of TF-01 (CI executed).
+
+## TF-02 manual check — real GitHub login, 2026-10-09
+
+The owner signed in with GitHub on the local development server and created the project "proyecto base"; screenshots of its settings page (owner listed as the signed-in user) and of the project list were shared. This closes the only open criterion of TF-02 ("real login works locally"). Logout was not part of the evidence; it is covered by the automated test.
+
+## Visual layer (Tailwind), 2026-10-09 (branch `ui/tailwind`)
+
+`lint`, `format:check`, `typecheck`, `npm test` (144 passed) and `build` exit 0; the CSS bundle contains the shared classes. Browser check on the production build with a test session: login, projects list, and settings render styled on desktop; at 375 px the settings page has no horizontal scroll (`scrollWidth` 375 = `innerWidth`). Test data was removed and the owner's real project was left untouched.
+
+Not covered: contrast and keyboard-order audits, other browsers, the project page and profile on mobile.
+
+Process note: from this point validation clones use a separate database (not `docker compose down -v`), because the development database now holds real data.
