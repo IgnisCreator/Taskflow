@@ -180,3 +180,24 @@ Contrast was computed before choosing the values: every pair passed on the first
 Browser check (production build, test session): with no cookie the page follows the system (the pane's system theme is dark, shown as "Theme: Auto"); the button cycles to Light and the choice survives a reload, rendered by the server (`data-theme="light"` in the HTML, none for Auto); Dark renders cards, inputs, the primary button, and the red delete zone readably. Test data was removed; the owner's real project was untouched.
 
 Not covered: a screen-reader pass, touch-target size, other browsers, and the board (not built yet).
+
+## TF-05 — tasks and the board, 2026-10-09 (branch `tf-05/tasks`)
+
+Checks without `.env`, with the CI placeholder variables: `lint`, `format:check`, `typecheck`, `db:validate`, `db:migrate` (no new migration: the `Task` table exists since TF-03), `npm test` (11 files, 269 tests) and `build` all exit 0; new routes `/api/projects/[projectId]/board`, `/tasks` and `/tasks/[taskId]`.
+
+| Acceptance criterion (plan)                          | Evidence                                                                                                                                                                |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create, edit and delete persist                      | "adds it at the end of its column and records the author", "changes only the given fields...", "removes it and closes the gap in its column"                            |
+| Retrying with the same id gives 200 and a single row | "is safe to retry...", and the concurrent twin-request test                                                                                                             |
+| Rejects an external column or assignee               | "rejects a column that belongs to another project" (`INVALID_COLUMN`), "rejects an assignee who is not a member" (`INVALID_ASSIGNEE`), both with the database unchanged |
+| The due date does not change with the time zone      | "keep their day in the %s time zone" for UTC, America/Santiago and Pacific/Kiritimati (API, raw SQL and the board response)                                             |
+
+Also covered: author, project, position and column cannot be set by the client (400), title and description limits, bad priorities and dates (including month 13), the 200-task limit, task ids from another project (404 on create, edit and delete), stale versions (409, nothing changes), the snapshot (order, members without emails, version), and the permission matrix extended with the board and task routes (109 cases now).
+
+A unit test found a real bug during this milestone: `isCalendarDate("2026-13-01")` threw instead of returning false, which would have been a 500 rather than a 400. Fixed and covered at both levels.
+
+Mutation checks (each made tests fail, then reverted): VIEWER allowed to write (4), no idempotent replay (2), task lookup without the project (1), no gap closing after delete (1), due date read in local time (1).
+
+Browser walkthrough (production build, test sessions, built-in browser): the board shows four columns with priority, due date and assignee on each card; "Add task" opens the dialog; creating a task with priority, assignee and date shows its card; editing the title and priority updates it; deleting removes it; the database ended at version 3 with the right rows. A VIEWER sees no "Add task" button and a read-only dialog with only "Close". On a 375 px screen the page has no horizontal scroll. The first screenshot showed the dialog stuck to the top-left corner (the reset of Tailwind removes the native `margin: auto`); fixed in `.dialog` and checked again. Test data was removed; the owner's real project was untouched.
+
+Not covered: moving tasks (TF-06), filters and search (TF-07), a conflict walkthrough with two browsers (the 409 path is covered by API tests), end-to-end tests in CI, rate limiting, and an accessibility audit of the dialog with a screen reader.

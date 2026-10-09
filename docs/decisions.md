@@ -128,3 +128,21 @@ Use **Better Auth 1.7.7** with `@better-auth/prisma-adapter` 1.7.7, GitHub as th
 - **Dark theme is now in scope.** The original plan left it out of version 1; the owner asked for it on 2026-10-09. It follows the system by default; a header button cycles Auto, Light and Dark and stores the choice in a `theme` cookie that the server renders as `data-theme` on `<html>` (no flash, no inline script). Consequence: the root layout reads cookies, so every route renders dynamically, which is acceptable for an authenticated app.
 - **Enforced, not just documented:** a unit test checks WCAG AA contrast for 19 text pairs and 5 control pairs in both themes and that both copies of the dark values match; a CI step rejects raw colour classes in `src/`.
 - Mobile first, light and dark, no horizontal scroll at 375 px. Deeper UI work (board, keyboard alternatives to drag, empty and error states, touch-target audit) stays in TF-06 and TF-07.
+
+## ADR-006 — Tasks and the board (TF-05)
+
+- **Date:** 2026-10-09
+- **Status:** accepted (TF-05)
+
+### Decision
+
+- **Permissions:** `task:write` (create, edit, assign, delete; move in TF-06) belongs to the owner, ADMIN and MEMBER; a VIEWER only reads. A task of another project is `404` even when the caller belongs to both projects.
+- **Writes** go through `withProjectLock` like every other project mutation (ADR-003/004); each bumps `boardVersion` once.
+- **Idempotent creation:** the client generates the task `id` (UUID). Repeating a request whose response was lost returns `200` with the existing task, before any version check; a first creation is `201`. An id that belongs to another project is `404`. Two identical requests at once end with a single row (one wins, the other gets 200 or 409). The dialog keeps its draft id while it is open, so retries are safe.
+- **Order:** integer positions 0..n-1 per column. A new task goes to the end; deleting one closes the gap in its column. Moving tasks is TF-06.
+- **Limits:** at most 200 tasks per project (`409 LIMIT_REACHED`, counted inside the lock); title 1-160, description up to 5000, empty text stored as null.
+- **Due dates are calendar dates**, stored as `DATE` and exchanged as `"YYYY-MM-DD"`. They are read as UTC and never converted to local time, so they cannot shift with the time zone of the server (tested in UTC, America/Santiago and Pacific/Kiritimati). Impossible dates, including month 13, are `400`.
+- **Assignee and column** must belong to the project (`400 INVALID_ASSIGNEE` / `INVALID_COLUMN`); the composite foreign keys enforce the same in the database.
+- **Board snapshot:** `GET /api/projects/:id/board` reads project, members, ordered columns and tasks in one `REPEATABLE READ` transaction, so the data and `boardVersion` come from the same moment. All of it is returned (the 200-task limit makes pagination unnecessary); filters arrive in TF-07.
+- **UI:** four fixed columns; a task opens in a native `<dialog>` (focus trap and Esc from the platform) for create, edit, delete or read-only view. A 409 refreshes the board and keeps what the user typed; saving again repeats the intent with the new version. The delete confirmation is the `confirm` of the browser.
+- **ESLint:** `no-unused-vars` ignores rest siblings and names that start with an underscore, because dropping a key by destructuring is used deliberately.

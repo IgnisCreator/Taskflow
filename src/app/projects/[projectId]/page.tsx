@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getProject } from "@/server/services/projects";
+import { Board } from "@/components/board";
+import { ApiError } from "@/server/http";
+import { can } from "@/server/policies";
+import { getBoard } from "@/server/services/tasks";
 import { getCurrentUser } from "@/server/session";
 
 export default async function ProjectPage({
@@ -11,8 +14,13 @@ export default async function ProjectPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const project = await getProject(user.id, (await params).projectId);
-  if (!project) notFound();
+  const board = await getBoard(user.id, (await params).projectId).catch(
+    (error) => {
+      if (error instanceof ApiError && error.status === 404) notFound();
+      throw error;
+    },
+  );
+  const { project } = board;
 
   return (
     <main className="space-y-6">
@@ -28,19 +36,37 @@ export default async function ProjectPage({
             <p className="mt-1 text-muted">{project.description}</p>
           )}
         </div>
-        <span className="badge">
-          {project.isOwner ? "owner" : project.role}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="badge">
+            {project.isOwner ? "owner" : project.role}
+          </span>
+          <Link
+            href={`/projects/${project.id}/settings`}
+            className="btn-secondary"
+          >
+            Settings and members
+          </Link>
+        </div>
       </div>
-      <p>
-        <Link
-          href={`/projects/${project.id}/settings`}
-          className="btn-secondary"
-        >
-          Settings and members
-        </Link>
-      </p>
-      <p className="card text-muted">The board arrives in a later milestone.</p>
+      <Board
+        projectId={project.id}
+        boardVersion={project.boardVersion}
+        canWrite={can(project, "task:write")}
+        members={board.members.map(({ userId, name }) => ({ userId, name }))}
+        columns={board.columns.map((column) => ({
+          id: column.id,
+          name: column.name,
+          tasks: column.tasks.map((task) => ({
+            id: task.id,
+            columnId: task.columnId,
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            assigneeId: task.assigneeId,
+            dueDate: task.dueDate,
+          })),
+        }))}
+      />
     </main>
   );
 }

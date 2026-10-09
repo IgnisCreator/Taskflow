@@ -13,6 +13,7 @@ describe("project permissions", () => {
     ["project:edit", [true, true, false, false]],
     ["project:delete", [true, false, false, false]],
     ["member:manage", [true, true, false, false]],
+    ["task:write", [true, true, true, false]],
   ] as const)("%s for owner, admin, member, viewer", (action, expected) => {
     expect(callers.map((a) => can(a, action))).toEqual(expected);
   });

@@ -129,6 +129,12 @@
   .card-danger {
     @apply rounded-lg border border-danger bg-danger-soft p-5 text-fg;
   }
+  .dialog {
+    @apply m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg border border-line bg-surface p-5 text-fg shadow-lg;
+  }
+  .dialog::backdrop {
+    background: color-mix(in srgb, var(--fg) 45%, transparent);
+  }
   .badge {
     @apply inline-flex items-center rounded-full bg-subtle px-2 py-0.5 text-xs font-medium text-muted capitalize;
   }

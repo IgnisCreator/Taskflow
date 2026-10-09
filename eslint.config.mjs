@@ -5,6 +5,19 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    // Dropping a key with `const { dropped, ...rest } = value` is intentional in this codebase.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          ignoreRestSiblings: true,
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",
