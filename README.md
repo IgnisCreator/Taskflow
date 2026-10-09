@@ -1,5 +1,7 @@
 # TaskFlow
 
+[![CI](https://github.com/IgnisCreator/Taskflow/actions/workflows/ci.yml/badge.svg)](https://github.com/IgnisCreator/Taskflow/actions/workflows/ci.yml)
+
 <!-- TODO(owner): project pitch and status badge (English). -->
 
 ## Overview

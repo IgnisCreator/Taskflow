@@ -158,3 +158,5 @@ Known limits: the pages are unstyled (UI work comes later), there is no end-to-e
 ## First CI run on GitHub — 2026-10-09
 
 Commit `d33c994` (first push). The run **failed in "Initialize containers"** with "Docker pull failed with exit code 1" (retried three times) before any workflow step ran, so lint, tests and build have still **not** run on GitHub. `postgres:18.6` exists (`docker manifest inspect`). Cause not confirmed; to be re-checked on the next push.
+
+**Update, same day:** the next push (`6f21a2d`, merge of TF-04) ran green on GitHub Actions in 53 s: all 13 steps succeeded, including lint, formatting, typecheck, Prisma validation, the test-helper guard, migrations against the service PostgreSQL, the 144 tests and the build (https://github.com/IgnisCreator/Taskflow/actions/runs/37996388559). The earlier failure was a transient image pull problem; nothing in the workflow changed. This closes the open item of TF-01 (CI executed).
