@@ -73,3 +73,14 @@ Applied the verified findings of the over-engineering audit (4 direct dependenci
 Not verified: that `prisma/migrations` is Prisma 7's default migrations path (the explicit setting was kept), and a fresh-clone `npm ci` after this change (see next entry).
 
 Fresh clone of commit `aacccc8` (2026-10-09): `npm ci` 61 s, `lint`, `format:check`, `typecheck`, `test` (3 passed), `db:validate` and `build` all exit 0. Direct dependencies: 6 production + 10 development, none with a version range. The full PostgreSQL migrate run remains un-reverified until Docker is running.
+
+## Docker and migrations re-check — 2026-10-09
+
+| Check                                                                            | Result                                                                                                                           |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `docker compose up -d --wait` with the new `name: taskflow-p1`                   | exit 0, container healthy; own network and volume (`taskflow-p1_*`)                                                              |
+| `npm run db:migrate` on an empty database                                        | exit 0, "No migration found in prisma/migrations" (`.env` loaded by `process.loadEnvFile()`)                                     |
+| Default migrations path: config without `migrations.path` plus a probe migration | Prisma found and applied `prisma/migrations/00000000000000_probe`; the setting was removed (audit point 11). Probe files deleted |
+| `docker compose down -v`                                                         | removed only `taskflow-p1_*` resources                                                                                           |
+
+Closes the two items left open on 2026-10-09. The project `name:` was added because a previous Compose project in another folder was also called `taskflow`, and an earlier `down` of this repo removed that project's network.

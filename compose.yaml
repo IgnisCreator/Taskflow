@@ -1,3 +1,4 @@
+name: taskflow-p1
 services:
   postgres:
     image: postgres:18.6
