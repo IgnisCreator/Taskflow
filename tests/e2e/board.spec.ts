@@ -280,3 +280,34 @@ test("on a phone-sized screen the page does not scroll sideways", async ({
   expect(overflow).toBeLessThanOrEqual(0);
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
 });
+
+test("the landing page explains Kanban, and its button depends on the session", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "What is Kanban?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Go to your projects" }).first(),
+  ).toBeVisible();
+
+  await context.clearCookies();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Sign in with GitHub" }).first(),
+  ).toHaveAttribute("href", "/login");
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/landing.png", fullPage: true });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.screenshot({
+    path: "test-results/landing-dark.png",
+    fullPage: true,
+  });
+});
