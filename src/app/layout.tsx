@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getCurrentUser } from "@/server/session";
 import { ThemeToggle, type Theme } from "@/components/theme-toggle";
 import "./globals.css";
 
@@ -15,6 +16,7 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
+  const user = await getCurrentUser();
   const saved = (await cookies()).get("theme")?.value;
   const theme: Theme = saved === "light" || saved === "dark" ? saved : "auto";
 
@@ -27,7 +29,7 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <header className="border-b border-line bg-surface">
+        <header className="sticky top-0 z-10 border-b border-line bg-surface">
           <nav
             aria-label="Main"
             className="mx-auto flex max-w-4xl items-center gap-6 px-4 py-3 text-sm"
@@ -35,12 +37,20 @@ export default async function RootLayout({
             <Link href="/" className="text-base font-semibold text-link">
               TaskFlow
             </Link>
-            <Link href="/projects" className="text-muted hover:text-fg">
-              Projects
-            </Link>
-            <Link href="/profile" className="text-muted hover:text-fg">
-              Profile
-            </Link>
+            {user ? (
+              <>
+                <Link href="/projects" className="text-muted hover:text-fg">
+                  Projects
+                </Link>
+                <Link href="/profile" className="text-muted hover:text-fg">
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <Link href="/login" className="text-muted hover:text-fg">
+                Sign in
+              </Link>
+            )}
             <ThemeToggle initial={theme} />
           </nav>
         </header>

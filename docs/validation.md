@@ -241,3 +241,7 @@ Real problem found: searching `_` or `%` returned every task (Prisma does not es
 Mutation checks (each made a test fail, then reverted): no wildcard escaping (1 test), drag not disabled while filtered (E2E; the first attempt was invalid because the E2E runs a production build and I had not rebuilt, the second one, rebuilt, failed as expected).
 
 Not covered: a screen-reader pass, touch and keyboard drag in the browser tests, a combined filter by text and a tab in a second browser, creating a task while a filter hides it (it is created, and may not show until the filter is cleared).
+
+## Landing page, 2026-10-09 (branch `tf-07b/landing`)
+
+`/` is now a landing page: what TaskFlow does, an explanation of Kanban (origin, an example board, three principles; it says plainly that TaskFlow does not enforce per-column limits), and a button that depends on the session ("Go to your projects" or "Sign in with GitHub"). The header is sticky and shows "Sign in" to anonymous visitors. Checked with an E2E test (both session states, no horizontal scroll at 375 px) and screenshots in light, dark and phone width. Only design tokens are used (the colour guard passes).
