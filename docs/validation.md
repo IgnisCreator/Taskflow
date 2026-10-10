@@ -245,3 +245,12 @@ Not covered: a screen-reader pass, touch and keyboard drag in the browser tests,
 ## Landing page, 2026-10-09 (branch `tf-07b/landing`)
 
 `/` is now a landing page: what TaskFlow does, an explanation of Kanban (origin, an example board, three principles; it says plainly that TaskFlow does not enforce per-column limits), and a button that depends on the session ("Go to your projects" or "Sign in with GitHub"). The header is sticky and shows "Sign in" to anonymous visitors. Checked with an E2E test (both session states, no horizontal scroll at 375 px) and screenshots in light, dark and phone width. Only design tokens are used (the colour guard passes).
+
+## Email login with confirmation, 2026-10-10 (branch `tf-09/email-login`)
+
+Checks: `lint`, `format:check`, `typecheck`, `npm test` (15 files, 325 tests), `build`, `npm run test:e2e` (15 browser tests) pass.
+
+- Integration (`tests/integration/email-login.test.ts`, the mailbox is a mock of `sendEmail`): sign-up sends one link and creates no session; sign-in before confirming is 403 with no session and sends a new link; opening the link marks the user verified and sign-in then works (`/api/me` returns the user); a wrong password is 401; a made-up token is rejected; a short password is 400.
+- Mutation check: `requireEmailVerification: false` makes the "refused until confirmed" test fail; reverted.
+- E2E: a confirmed user signs in and lands on `/projects`; the form creates the account and shows the confirmation notice with the address; signing in unconfirmed shows the same notice and `/projects` still redirects to `/login`; a wrong password shows an error.
+- **Not covered:** a real email delivered by Resend (no key was used, as agreed); clicking the link in a real browser (covered at API level); "forgot password"; the rate limiter. The production E2E server logs "RESEND_API_KEY is not set" because the build runs in production mode; the test still passes, and the log is the failure mode described in ADR-009.

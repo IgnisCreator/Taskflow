@@ -15,6 +15,7 @@ const auth = betterAuth({
   baseURL: E2E_ORIGIN,
   secret: E2E_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  emailAndPassword: { enabled: true },
   plugins: [testUtils()],
 });
 
@@ -141,4 +142,18 @@ export async function moveAs(
     },
   );
   if (!res.ok) throw new Error(`moveAs failed: ${res.status}`);
+}
+
+/** A user with a password whose email is already confirmed, as if the link had been opened. */
+export async function createConfirmedEmailUser(
+  email: string,
+  password: string,
+) {
+  await auth.api.signUpEmail({
+    body: { name: "Confirmed User", email, password },
+  });
+  await prisma.user.updateMany({
+    where: { email },
+    data: { emailVerified: true },
+  });
 }

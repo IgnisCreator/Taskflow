@@ -1,5 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { cleanup, moveAs, seedBoard, serverBoard } from "./fixtures";
+import {
+  cleanup,
+  createConfirmedEmailUser,
+  moveAs,
+  seedBoard,
+  serverBoard,
+} from "./fixtures";
 
 type Seed = Awaited<ReturnType<typeof seedBoard>>;
 let seed: Seed;
@@ -310,4 +316,56 @@ test("the landing page explains Kanban, and its button depends on the session", 
     path: "test-results/landing-dark.png",
     fullPage: true,
   });
+});
+
+test("email sign-up asks the user to confirm, and an unconfirmed account cannot sign in", async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  const email = `form-${Date.now()}@example.test`;
+  await page.goto("/login");
+  await page
+    .getByRole("button", { name: "Create an account with email" })
+    .click();
+  await page.getByLabel("Name").fill("Form User");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("a long enough password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.locator('p[role="status"]')).toContainText(
+    `confirmation link to ${email}`,
+  );
+
+  // Same address, correct password, link not opened yet: no session, same instruction.
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("a long enough password");
+  await page.getByRole("button", { name: "Sign in with email" }).click();
+  await expect(page.locator('p[role="status"]')).toContainText(
+    "Check your inbox",
+  );
+  await page.goto("/projects");
+  await expect(page).toHaveURL(/\/login/);
+
+  // A wrong password is an error, not a prompt to confirm.
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("not the right password");
+  await page.getByRole("button", { name: "Sign in with email" }).click();
+  await expect(page.locator('p[role="alert"]')).toBeVisible();
+});
+
+test("a confirmed user signs in with email and password", async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  const email = `confirmed-${Date.now()}@example.test`;
+  await createConfirmedEmailUser(email, "a long enough password");
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("a long enough password");
+  await page.getByRole("button", { name: "Sign in with email" }).click();
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
 });
