@@ -56,11 +56,8 @@ jobs:
         run: npm run typecheck
       - name: Validate Prisma schema
         run: npm run db:validate
-      - name: Guard against test helpers in app code
-        run: "! grep -rnE 'testUtils|tests/helpers' src"
-      - name: Guard against raw colours (use the design tokens)
-        run: |
-          ! grep -rnE '(bg|text|border|ring|outline|divide|from|to|via|fill|stroke|shadow|decoration|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]|(bg|text|border)-(white|black)\b' src
+      - name: Source guards (test helpers, raw colours)
+        run: bash scripts/guards.sh
       - name: Apply migrations
         run: npm run db:migrate
       - name: Test

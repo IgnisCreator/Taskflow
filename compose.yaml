@@ -19,5 +19,41 @@ services:
       retries: 10
       start_period: 10s
 
+  # Tools (profile "tools", never started by a plain `docker compose up`). Same image as the
+  # browser tests: Playwright 1.64.0 with Node 24 and Chromium. Placeholder secrets only.
+  check: # the CI pipeline in a clean clone of a local branch (scripts/check.sh)
+    profiles: [tools]
+    image: mcr.microsoft.com/playwright:v1.64.0-noble
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./:/repo:ro
+    environment: &tool-env
+      DATABASE_URL: postgresql://taskflow:taskflow@postgres:5432/taskflow_ci
+      BETTER_AUTH_SECRET: ci-placeholder-secret-0123456789abcdef
+      AUTH_GITHUB_ID: ci-placeholder
+      AUTH_GITHUB_SECRET: ci-placeholder
+      CI: "true"
+    entrypoint: ["bash", "/repo/scripts/check.sh"]
+
+  tools: # any npm script on the working tree, e.g. `docker compose run --rm tools npm test`
+    profiles: [tools]
+    image: mcr.microsoft.com/playwright:v1.64.0-noble
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./:/app
+      # Linux packages and build output stay in volumes, apart from the host's.
+      - tools-node-modules:/app/node_modules
+      - tools-next:/app/.next
+    environment:
+      <<: *tool-env
+      DATABASE_URL: postgresql://taskflow:taskflow@postgres:5432/taskflow_test
+
 volumes:
   taskflow-pgdata:
+  tools-node-modules:
+  tools-next:
