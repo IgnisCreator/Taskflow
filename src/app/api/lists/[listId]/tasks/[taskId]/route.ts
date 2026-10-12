@@ -8,9 +8,17 @@ import {
   readJson,
   requireUser,
 } from "@/server/http";
+import { getTaskDetail } from "@/server/services/details";
 import { deleteTask, updateTask } from "@/server/services/tasks";
 
 type Context = { params: Promise<{ listId: string; taskId: string }> };
+
+/** Checklist, comments and history of the task, for its dialog. */
+export const GET = handle(async (_request: Request, { params }: Context) => {
+  const user = await requireUser();
+  const { listId, taskId } = await params;
+  return json(await getTaskDetail(user.id, listId, taskId));
+});
 
 export const PATCH = handle(async (request: Request, { params }: Context) => {
   assertSameOrigin(request);

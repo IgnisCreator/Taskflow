@@ -22,7 +22,7 @@ describe("createTaskSchema", () => {
       title: "Hi",
       description: null,
       priority: "MEDIUM",
-      assigneeId: null,
+      assigneeIds: [],
       dueDate: null,
     });
   });
@@ -41,8 +41,11 @@ describe("updateTaskSchema", () => {
   it("needs at least one field besides the version", () => {
     expect(() => updateTaskSchema.parse({ expectedBoardVersion: 0 })).toThrow();
     expect(
-      updateTaskSchema.parse({ expectedBoardVersion: 0, assigneeId: null })
-        .assigneeId,
+      updateTaskSchema.parse({ expectedBoardVersion: 0, assigneeIds: [] })
+        .assigneeIds,
+    ).toEqual([]);
+    expect(
+      updateTaskSchema.parse({ expectedBoardVersion: 0, typeId: null }).typeId,
     ).toBeNull();
   });
 });

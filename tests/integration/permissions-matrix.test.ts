@@ -22,6 +22,20 @@ const folder = await import("@/app/api/folders/[folderId]/route");
 const lists = await import("@/app/api/lists/route");
 const list = await import("@/app/api/lists/[listId]/route");
 const board = await import("@/app/api/lists/[listId]/board/route");
+const subtasks =
+  await import("@/app/api/lists/[listId]/tasks/[taskId]/subtasks/route");
+const subtask =
+  await import("@/app/api/lists/[listId]/tasks/[taskId]/subtasks/[subtaskId]/route");
+const comments =
+  await import("@/app/api/lists/[listId]/tasks/[taskId]/comments/route");
+const comment =
+  await import("@/app/api/lists/[listId]/tasks/[taskId]/comments/[commentId]/route");
+const activity = await import("@/app/api/lists/[listId]/activity/route");
+const catalog =
+  await import("@/app/api/workspaces/[workspaceId]/catalog/route");
+const catalogKind =
+  await import("@/app/api/workspaces/[workspaceId]/catalog/[kind]/route");
+const catalogItem = await import("@/app/api/catalog/[kind]/[itemId]/route");
 const flow = await import("@/app/api/lists/[listId]/flow/route");
 const templates =
   await import("@/app/api/workspaces/[workspaceId]/templates/route");
@@ -162,6 +176,45 @@ const onTemplate =
       send(method, `/api/templates/${c.templateId}`, body),
       { templateId: c.templateId },
     );
+
+const onSubtask = (
+  handler: typeof subtask.PATCH | typeof subtask.DELETE,
+  method: string,
+  body?: object,
+): Call =>
+  route(
+    handler,
+    method,
+    (c) => ({
+      path: `/api/lists/${c.listId}/tasks/${c.taskId}/subtasks/${c.subtaskId}`,
+      params: { listId: c.listId, taskId: c.taskId, subtaskId: c.subtaskId },
+    }),
+    body && (() => body),
+  );
+
+const onComment = route(comment.DELETE, "DELETE", (c) => ({
+  path: `/api/lists/${c.listId}/tasks/${c.taskId}/comments/${c.commentId}`,
+  params: { listId: c.listId, taskId: c.taskId, commentId: c.commentId },
+}));
+
+const onCatalogItem = (
+  handler: typeof catalogItem.PATCH | typeof catalogItem.DELETE,
+  method: string,
+  kind: "types" | "labels",
+  body?: object,
+): Call =>
+  route(
+    handler,
+    method,
+    (c) => {
+      const itemId = kind === "types" ? c.typeId : c.labelId;
+      return {
+        path: `/api/catalog/${kind}/${itemId}`,
+        params: { kind, itemId },
+      };
+    },
+    body && (() => body),
+  );
 
 // [route, call, expected status per caller (owner, admin, member, guest, stranger, anonymous)]
 const matrix: [string, Call, number[]][] = [
@@ -371,6 +424,95 @@ const matrix: [string, Call, number[]][] = [
   [
     "DELETE template",
     onTemplate(template.DELETE, "DELETE"),
+    [204, 204, 403, 403, 404, 401],
+  ],
+  // Task details: members write them, a guest only reads, and the board version is not involved.
+  [
+    "GET task detail",
+    route(task.GET, "GET", ta()),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  [
+    "POST subtask",
+    route(subtasks.POST, "POST", ta("/subtasks"), () => ({
+      title: "New step",
+    })),
+    [201, 201, 201, 403, 404, 401],
+  ],
+  [
+    "PATCH subtask",
+    onSubtask(subtask.PATCH, "PATCH", { done: true }),
+    [200, 200, 200, 403, 404, 401],
+  ],
+  [
+    "DELETE subtask",
+    onSubtask(subtask.DELETE, "DELETE"),
+    [204, 204, 204, 403, 404, 401],
+  ],
+  [
+    "POST comment",
+    route(comments.POST, "POST", ta("/comments"), () => ({
+      body: "A comment",
+    })),
+    [201, 201, 201, 403, 404, 401],
+  ],
+  // The fixture comment was written by the member: its author and the admins can delete it.
+  ["DELETE comment", onComment, [204, 204, 204, 403, 404, 401]],
+  [
+    "GET activity",
+    route(activity.GET, "GET", li("/activity")),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  // The workspace lists of task types and labels: members read, OWNER and ADMIN change.
+  [
+    "GET catalog",
+    route(catalog.GET, "GET", ws("/catalog")),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  [
+    "POST task type",
+    route(
+      catalogKind.POST,
+      "POST",
+      (c) => ({
+        path: `/api/workspaces/${c.workspaceId}/catalog/types`,
+        params: { workspaceId: c.workspaceId, kind: "types" },
+      }),
+      () => ({ name: "Spike" }),
+    ),
+    [201, 201, 403, 403, 404, 401],
+  ],
+  [
+    "POST label",
+    route(
+      catalogKind.POST,
+      "POST",
+      (c) => ({
+        path: `/api/workspaces/${c.workspaceId}/catalog/labels`,
+        params: { workspaceId: c.workspaceId, kind: "labels" },
+      }),
+      () => ({ name: "later" }),
+    ),
+    [201, 201, 403, 403, 404, 401],
+  ],
+  [
+    "PATCH task type",
+    onCatalogItem(catalogItem.PATCH, "PATCH", "types", { name: "Renamed" }),
+    [200, 200, 403, 403, 404, 401],
+  ],
+  [
+    "DELETE task type",
+    onCatalogItem(catalogItem.DELETE, "DELETE", "types"),
+    [204, 204, 403, 403, 404, 401],
+  ],
+  [
+    "PATCH label",
+    onCatalogItem(catalogItem.PATCH, "PATCH", "labels", { name: "Renamed" }),
+    [200, 200, 403, 403, 404, 401],
+  ],
+  [
+    "DELETE label",
+    onCatalogItem(catalogItem.DELETE, "DELETE", "labels"),
     [204, 204, 403, 403, 404, 401],
   ],
   // Tasks: owner, admin and member write; a guest only reads.

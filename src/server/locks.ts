@@ -96,6 +96,26 @@ export async function withListLock<T>(
 }
 
 /**
+ * For small writes that belong to a list but are not board changes (subtasks, comments): checks
+ * access and permission like withListLock (hidden is 404, not allowed is 403) but takes no version,
+ * so the board does not reload for them. `work` runs in one transaction.
+ */
+export async function withListAccess<T>(
+  userId: string,
+  listId: string,
+  action: WorkspaceAction,
+  work: (tx: Tx, actor: ListActor) => Promise<T>,
+): Promise<T> {
+  return db.$transaction(async (tx) => {
+    const access = await readListAccess(tx, userId, listId);
+    if (!access) throw notFound("List");
+    if (!can(access, action)) throw forbidden();
+    const { boardVersion: _version, ...actor } = access;
+    return work(tx, actor);
+  });
+}
+
+/**
  * Serialises changes to a workspace (members, structure): one UPDATE on the workspace row, guarded by
  * membership, holds it until commit, so for example the member limit cannot be raced. No version.
  */

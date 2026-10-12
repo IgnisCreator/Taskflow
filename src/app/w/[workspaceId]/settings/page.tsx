@@ -1,10 +1,12 @@
 import { ApiForm } from "@/components/api-form";
+import { CatalogSection } from "@/components/catalog-section";
 import { MembersPanel } from "@/components/members-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { roleLabel } from "@/lib/roles";
 import { ROLES } from "@/lib/validations/workspaces";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
+import { listCatalog } from "@/server/services/catalog";
 import { listMembers } from "@/server/services/members";
 import { listTemplates } from "@/server/services/templates";
 
@@ -17,6 +19,7 @@ export default async function WorkspaceSettingsPage({
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const members = await listMembers(user.id, workspace.id);
   const templates = await listTemplates(user.id, workspace.id);
+  const catalog = await listCatalog(user.id, workspace.id);
   const url = `/api/workspaces/${workspace.id}`;
 
   return (
@@ -98,6 +101,24 @@ export default async function WorkspaceSettingsPage({
               ))}
             </ul>
           </section>
+        )}
+        {can(workspace, "structure:manage") && (
+          <>
+            <CatalogSection
+              workspaceId={workspace.id}
+              kind="types"
+              title="Task types"
+              help="The kinds of work your team handles (a task, a bug, a request...). Metrics can be split by type."
+              items={catalog.types}
+            />
+            <CatalogSection
+              workspaceId={workspace.id}
+              kind="labels"
+              title="Labels"
+              help="Free tags any task can carry, to group work across lists."
+              items={catalog.labels}
+            />
+          </>
         )}
         <MembersPanel
           workspaceId={workspace.id}

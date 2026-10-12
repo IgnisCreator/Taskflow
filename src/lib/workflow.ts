@@ -187,6 +187,19 @@ export const SYSTEM_TEMPLATES: Record<string, Template> = {
 
 export const DEFAULT_TEMPLATE = "system:generic";
 
+export type MoveEventType = "MOVED" | "DISCARDED" | "REOPENED";
+
+/**
+ * The kind of history event for a task that changes stage: reaching a discarded stage is
+ * DISCARDED, leaving done or discarded for work that is not closed is REOPENED, anything else is
+ * a plain MOVED (including done to discarded and discarded to done).
+ */
+export function moveEventType(from: Category, to: Category): MoveEventType {
+  if (to === "DISCARDED") return "DISCARDED";
+  const closed = (c: Category) => c === "DONE" || c === "DISCARDED";
+  return closed(from) && !closed(to) ? "REOPENED" : "MOVED";
+}
+
 /** A system template by its "system:<key>" reference, or undefined. */
 export function systemTemplate(ref: string): Template | undefined {
   return ref.startsWith("system:")

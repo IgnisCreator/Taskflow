@@ -9,6 +9,7 @@ import {
   type WorkspaceActor,
 } from "@/server/locks";
 
+import { canSeeSpace } from "@/server/policies";
 import { assertTemplate } from "@/server/services/templates";
 
 const spaceSelect = {
@@ -70,6 +71,31 @@ export async function getSpaceSettings(userId: string, spaceId: string) {
   };
 }
 
+/**
+ * Takes people off the tasks of a space they can no longer see (after a listing was removed or the
+ * space became private), so nobody stays assigned to work hidden from them.
+ */
+async function dropAssignmentsWithoutAccess(tx: Tx, spaceId: string) {
+  const space = await tx.space.findUniqueOrThrow({
+    where: { id: spaceId },
+    select: {
+      isPrivate: true,
+      members: { select: { userId: true } },
+      workspace: {
+        select: { members: { select: { userId: true, role: true } } },
+      },
+    },
+  });
+  const listed = new Set(space.members.map((m) => m.userId));
+  const blind = space.workspace.members
+    .filter((m) => !canSeeSpace(m.role, space, listed.has(m.userId)))
+    .map((m) => m.userId);
+  if (blind.length === 0) return;
+  await tx.taskAssignee.deleteMany({
+    where: { userId: { in: blind }, task: { list: { spaceId } } },
+  });
+}
+
 export async function createSpace(
   userId: string,
   workspaceId: string,
@@ -100,11 +126,13 @@ export async function updateSpace(
       if (changes.defaultTemplate) {
         await assertTemplate(tx, workspaceId, changes.defaultTemplate);
       }
-      return tx.space.update({
+      const updated = await tx.space.update({
         where: { id: spaceId },
         data: changes,
         select: spaceSelect,
       });
+      if (changes.isPrivate) await dropAssignmentsWithoutAccess(tx, spaceId);
+      return updated;
     },
   );
 }
@@ -157,9 +185,10 @@ export async function removeSpaceMember(
   spaceId: string,
   targetId: string,
 ) {
-  await withSpaceLock(userId, spaceId, "structure:manage", (tx) =>
-    tx.spaceMember.deleteMany({ where: { spaceId, userId: targetId } }),
-  );
+  await withSpaceLock(userId, spaceId, "structure:manage", async (tx) => {
+    await tx.spaceMember.deleteMany({ where: { spaceId, userId: targetId } });
+    await dropAssignmentsWithoutAccess(tx, spaceId);
+  });
 }
 
 export async function createFolder(

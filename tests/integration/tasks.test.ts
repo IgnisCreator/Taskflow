@@ -93,7 +93,7 @@ describe("creating a task", () => {
       title: "Second",
       description: null,
       priority: "HIGH",
-      assigneeId: null,
+      assigneeIds: [],
       dueDate: null,
       position: 1,
       createdById: world.owner.id,
@@ -212,7 +212,7 @@ describe("creating a task", () => {
 
     const res = await create(
       listId,
-      draft(await firstColumn(listId), { assigneeId: world.stranger.id }),
+      draft(await firstColumn(listId), { assigneeIds: [world.stranger.id] }),
     );
 
     expect(res.status).toBe(400);
@@ -226,7 +226,7 @@ describe("creating a task", () => {
 
     const res = await create(
       listId,
-      draft(await firstColumn(listId), { assigneeId: world.member.id }),
+      draft(await firstColumn(listId), { assigneeIds: [world.member.id] }),
     );
 
     expect(res.status).toBe(400);
@@ -310,7 +310,7 @@ describe("editing a task", () => {
     const res = await patch(listId, taskId, {
       title: "Renamed",
       priority: "LOW",
-      assigneeId: world.guest.id,
+      assigneeIds: [world.guest.id],
       dueDate: "2026-05-20",
       expectedBoardVersion: 0,
     });
@@ -319,21 +319,21 @@ describe("editing a task", () => {
     expect(task).toMatchObject({
       title: "Renamed",
       priority: "LOW",
-      assigneeId: world.guest.id,
+      assigneeIds: [world.guest.id],
       dueDate: "2026-05-20",
       position: 0,
     });
     expect(boardVersion).toBe(1);
 
     const cleared = await patch(listId, taskId, {
-      assigneeId: null,
+      assigneeIds: [],
       dueDate: null,
       description: "   ",
       expectedBoardVersion: 1,
     });
     expect((await cleared.json()).task).toMatchObject({
       title: "Renamed",
-      assigneeId: null,
+      assigneeIds: [],
       dueDate: null,
       description: null,
     });
@@ -360,7 +360,7 @@ describe("editing a task", () => {
     const { listId, taskId } = await createListFor(world);
     const before = await snapshotList(listId);
     const res = await patch(listId, taskId, {
-      assigneeId: world.stranger.id,
+      assigneeIds: [world.stranger.id],
       expectedBoardVersion: 0,
     });
     expect(res.status).toBe(400);

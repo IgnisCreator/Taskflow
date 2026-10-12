@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api-client";
+import { TaskDetails } from "@/components/task-details";
 
 export type TaskView = {
   id: string;
@@ -10,8 +11,19 @@ export type TaskView = {
   title: string;
   description: string | null;
   priority: "LOW" | "MEDIUM" | "HIGH";
-  assigneeId: string | null;
   dueDate: string | null;
+  assigneeIds: string[];
+  type: { id: string; name: string } | null;
+  labels: { id: string; name: string }[];
+  /** Why the task is blocked, or null. */
+  blockedReason: string | null;
+  subtasks: { total: number; done: number };
+};
+
+/** The workspace task types and labels, for the pickers. */
+export type CatalogView = {
+  types: { id: string; name: string }[];
+  labels: { id: string; name: string }[];
 };
 
 /** `total` counts every task of the column, `tasks` only those that pass the active filter. */
@@ -48,6 +60,9 @@ export function TaskDialog({
   listId,
   columns,
   members,
+  catalog,
+  viewerId,
+  canModerate,
   canWrite,
   busy,
   filtered,
@@ -58,6 +73,10 @@ export function TaskDialog({
   listId: string;
   columns: ColumnView[];
   members: MemberView[];
+  catalog: CatalogView;
+  /** For comments: who is reading, and whether they can delete other people comments. */
+  viewerId: string;
+  canModerate: boolean;
   canWrite: boolean;
   busy: boolean;
   filtered: boolean;
@@ -106,10 +125,21 @@ export function TaskDialog({
       title: form.get("title"),
       description: form.get("description"),
       priority: form.get("priority"),
-      assigneeId: form.get("assigneeId") || null,
+      typeId: form.get("typeId") || null,
+      assigneeIds: form.getAll("assigneeIds"),
+      labelIds: form.getAll("labelIds"),
       dueDate: form.get("dueDate") || null,
       expectedBoardVersion: version,
     };
+    // Blocking exists for tasks that already exist; the reason is required while it is on.
+    const blocked =
+      state.mode === "edit"
+        ? {
+            blockedReason: form.get("blocked")
+              ? String(form.get("blockedReason")).trim()
+              : null,
+          }
+        : {};
     setPending(true);
     setError(null);
     const result =
@@ -119,11 +149,10 @@ export function TaskDialog({
             id: state.draftId, // kept while the dialog is open, so a retry cannot duplicate
             columnId: state.columnId,
           })
-        : await api(
-            "PATCH",
-            `/api/lists/${listId}/tasks/${state.task.id}`,
-            fields,
-          );
+        : await api("PATCH", `/api/lists/${listId}/tasks/${state.task.id}`, {
+            ...fields,
+            ...blocked,
+          });
     setPending(false);
     if (result.ok || !result.network) router.refresh(); // not when the server was unreachable
     if (result.ok) onClose();
@@ -205,22 +234,38 @@ export function TaskDialog({
               </select>
             </label>
             <label className="field">
-              Assignee
+              Type
               <select
-                name="assigneeId"
-                defaultValue={task?.assigneeId ?? ""}
+                name="typeId"
+                defaultValue={task?.type?.id ?? ""}
                 disabled={readOnly}
                 className="input"
               >
-                <option value="">Unassigned</option>
-                {members.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.name}
+                <option value="">No type</option>
+                {catalog.types.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+          <Choices
+            legend="Assignees"
+            name="assigneeIds"
+            options={members.map((m) => ({ id: m.userId, name: m.name }))}
+            checked={task?.assigneeIds ?? []}
+            disabled={readOnly}
+            empty="Nobody can be assigned yet."
+          />
+          <Choices
+            legend="Labels"
+            name="labelIds"
+            options={catalog.labels}
+            checked={task?.labels.map((l) => l.id) ?? []}
+            disabled={readOnly}
+            empty="The workspace has no labels yet. An admin can add them in the workspace settings."
+          />
           <label className="field">
             Due date
             <input
@@ -231,6 +276,28 @@ export function TaskDialog({
               className="input"
             />
           </label>
+          {canWrite && task && (
+            <fieldset className="space-y-2 border-t border-line pt-4">
+              <legend className="font-medium">Blocked</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="blocked"
+                  defaultChecked={task.blockedReason !== null}
+                />
+                This task is blocked
+              </label>
+              <label className="field">
+                Reason (required while blocked)
+                <input
+                  name="blockedReason"
+                  defaultValue={task.blockedReason ?? ""}
+                  maxLength={300}
+                  className="input"
+                />
+              </label>
+            </fieldset>
+          )}
           {canWrite && task && (
             <MoveControls
               task={task}
@@ -269,6 +336,16 @@ export function TaskDialog({
             )}
           </div>
         </form>
+      )}
+      {task && (
+        <TaskDetails
+          key={`details-${task.id}`}
+          listId={listId}
+          taskId={task.id}
+          viewerId={viewerId}
+          canWrite={canWrite}
+          canModerate={canModerate}
+        />
       )}
     </dialog>
   );
@@ -358,6 +435,47 @@ function MoveControls({
       >
         {filtered ? "Move to end" : "Move"}
       </button>
+    </fieldset>
+  );
+}
+
+/** A group of checkboxes sharing a name: the form reads them with getAll. */
+function Choices({
+  legend,
+  name,
+  options,
+  checked,
+  disabled,
+  empty,
+}: {
+  legend: string;
+  name: string;
+  options: { id: string; name: string }[];
+  checked: string[];
+  disabled: boolean;
+  empty: string;
+}) {
+  return (
+    <fieldset className="space-y-1">
+      <legend className="field">{legend}</legend>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted">{empty}</p>
+      ) : (
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {options.map((option) => (
+            <label key={option.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name={name}
+                value={option.id}
+                defaultChecked={checked.includes(option.id)}
+                disabled={disabled}
+              />
+              {option.name}
+            </label>
+          ))}
+        </div>
+      )}
     </fieldset>
   );
 }

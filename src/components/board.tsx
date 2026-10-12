@@ -20,6 +20,7 @@ import { dropTarget, moveTask } from "@/lib/board-order";
 import { formatDueDate } from "@/lib/dates";
 import {
   TaskDialog,
+  type CatalogView,
   type ColumnView,
   type DialogState,
   type MemberView,
@@ -47,6 +48,9 @@ export function Board({
   canWrite,
   columns,
   members,
+  catalog,
+  viewerId,
+  canModerate,
   filtered,
 }: {
   listId: string;
@@ -54,6 +58,9 @@ export function Board({
   canWrite: boolean;
   columns: ColumnView[];
   members: MemberView[];
+  catalog: CatalogView;
+  viewerId: string;
+  canModerate: boolean;
   /** A filter is active: the board shows part of the tasks, so dragging is off. */
   filtered: boolean;
 }) {
@@ -246,6 +253,9 @@ export function Board({
       </DndContext>
       <TaskDialog
         listId={listId}
+        catalog={catalog}
+        viewerId={viewerId}
+        canModerate={canModerate}
         columns={shown}
         members={members}
         canWrite={canWrite}
@@ -383,7 +393,9 @@ function CardContent({
   task: TaskView;
   members: MemberView[];
 }) {
-  const assignee = members.find((member) => member.userId === task.assigneeId);
+  const assignees = members
+    .filter((member) => task.assigneeIds.includes(member.userId))
+    .map((member) => member.name);
   return (
     <>
       <span className="block text-sm font-medium">{task.title}</span>
@@ -393,8 +405,24 @@ function CardContent({
         >
           {task.priority.toLowerCase()}
         </span>
+        {task.blockedReason !== null && (
+          <span className="badge text-danger-text" title={task.blockedReason}>
+            blocked
+          </span>
+        )}
+        {task.type && <span className="badge">{task.type.name}</span>}
+        {task.labels.map((label) => (
+          <span key={label.id} className="badge">
+            {label.name}
+          </span>
+        ))}
         {task.dueDate && <span>Due {formatDueDate(task.dueDate)}</span>}
-        {assignee && <span>{assignee.name}</span>}
+        {task.subtasks.total > 0 && (
+          <span>
+            {task.subtasks.done}/{task.subtasks.total} done
+          </span>
+        )}
+        {assignees.length > 0 && <span>{assignees.join(", ")}</span>}
       </span>
     </>
   );

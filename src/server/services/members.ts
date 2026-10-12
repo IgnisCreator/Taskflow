@@ -126,9 +126,11 @@ export async function removeMember(
     async (tx, actor) => {
       const from = await findRole(tx, workspaceId, targetId);
       if (!canManageMember(actor, { from })) throw forbidden();
-      await tx.task.updateMany({
-        where: { assigneeId: targetId, list: { space: { workspaceId } } },
-        data: { assigneeId: null },
+      await tx.taskAssignee.deleteMany({
+        where: {
+          userId: targetId,
+          task: { list: { space: { workspaceId } } },
+        },
       });
       await tx.workspaceMember.delete({
         where: { workspaceId_userId: { workspaceId, userId: targetId } },

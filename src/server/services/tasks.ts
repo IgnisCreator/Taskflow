@@ -2,12 +2,14 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { UNASSIGNED, type TaskFilter } from "@/lib/validations/filters";
 import { MAX_TASKS } from "@/lib/validations/tasks";
+import { moveEventType } from "@/lib/workflow";
 import type {
   CreateTaskInput,
   MoveTaskInput,
   UpdateTaskInput,
 } from "@/lib/validations/tasks";
 import { db } from "@/server/db";
+import { recordEvents } from "@/server/events";
 import { ApiError } from "@/server/http";
 import {
   forbidden,
@@ -24,20 +26,35 @@ const taskSelect = {
   title: true,
   description: true,
   priority: true,
-  assigneeId: true,
   dueDate: true,
+  blockedReason: true,
   position: true,
   createdById: true,
   createdAt: true,
   updatedAt: true,
+  type: { select: { id: true, name: true } },
+  assignees: { select: { userId: true } },
+  labels: { select: { label: { select: { id: true, name: true } } } },
+  subtasks: { select: { done: true } },
 } as const;
 
 type TaskRow = Prisma.TaskGetPayload<{ select: typeof taskSelect }>;
 
-/** Due dates leave as "YYYY-MM-DD"; the DATE column is read as UTC so no time zone can shift it. */
-const toTask = (row: TaskRow) => ({
+/**
+ * What the API and the board see of a task. Due dates leave as "YYYY-MM-DD" (the DATE column is
+ * read as UTC so no time zone can shift it); assignees as ids; subtasks only as a count.
+ */
+const toTask = ({ assignees, labels, subtasks, ...row }: TaskRow) => ({
   ...row,
   dueDate: row.dueDate ? row.dueDate.toISOString().slice(0, 10) : null,
+  assigneeIds: assignees.map((a) => a.userId),
+  labels: labels
+    .map((l) => l.label)
+    .sort((a, b) => a.name.localeCompare(b.name)),
+  subtasks: {
+    total: subtasks.length,
+    done: subtasks.filter((x) => x.done).length,
+  },
 });
 
 const toDate = (value: string | null | undefined) =>
@@ -48,15 +65,42 @@ const notFound = () => missing("Task");
 const invalid = (code: string, message: string) =>
   new ApiError(400, code, message);
 
-/** The assignee must be someone who can see the list: a workspace member with access to its space. */
-async function assertAssignee(
+/** Every assignee must be someone who can see the list: a workspace member with access to its space. */
+async function assertAssignees(
   tx: Prisma.TransactionClient,
   listId: string,
-  assigneeId: string | null | undefined,
+  assigneeIds: string[] | undefined,
 ) {
-  if (!assigneeId) return;
-  if (!(await readListAccess(tx, assigneeId, listId))) {
-    throw invalid("INVALID_ASSIGNEE", "The assignee cannot see this list");
+  for (const id of assigneeIds ?? []) {
+    if (!(await readListAccess(tx, id, listId))) {
+      throw invalid("INVALID_ASSIGNEE", "An assignee cannot see this list");
+    }
+  }
+}
+
+/** The type and the labels must belong to the workspace of the list. */
+async function assertCatalog(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  typeId: string | null | undefined,
+  labelIds: string[] | undefined,
+) {
+  if (
+    typeId &&
+    !(await tx.workItemType.count({ where: { id: typeId, workspaceId } }))
+  ) {
+    throw invalid(
+      "INVALID_TYPE",
+      "That task type does not exist in this workspace",
+    );
+  }
+  const ids = labelIds ?? [];
+  if (
+    ids.length &&
+    (await tx.label.count({ where: { id: { in: ids }, workspaceId } })) !==
+      ids.length
+  ) {
+    throw invalid("INVALID_LABEL", "A label does not exist in this workspace");
   }
 }
 
@@ -75,7 +119,12 @@ export async function getBoard(
   const q = filter.q?.replace(/[\\%_]/g, (char) => `\\${char}`);
   const where: Prisma.TaskWhereInput = {
     priority: filter.priority,
-    assigneeId: filter.assignee === UNASSIGNED ? null : filter.assignee,
+    assignees:
+      filter.assignee === UNASSIGNED
+        ? { none: {} }
+        : filter.assignee
+          ? { some: { userId: filter.assignee } }
+          : undefined,
     OR: q
       ? [
           { title: { contains: q, mode: "insensitive" } },
@@ -186,17 +235,23 @@ export async function createTask(
       listId,
       expectedBoardVersion,
       "task:write",
-      async (tx) => {
+      async (tx, actor) => {
         const column = await tx.boardColumn.findFirst({
           where: { id: input.columnId, listId },
-          select: { id: true },
+          select: { id: true, category: true },
         });
         if (!column)
           throw invalid(
             "INVALID_COLUMN",
             "The column is not part of this list",
           );
-        await assertAssignee(tx, listId, input.assigneeId);
+        await assertAssignees(tx, listId, input.assigneeIds);
+        await assertCatalog(
+          tx,
+          actor.workspaceId,
+          input.typeId,
+          input.labelIds,
+        );
 
         const total = await tx.task.count({ where: { listId } });
         if (total >= MAX_TASKS) {
@@ -209,7 +264,7 @@ export async function createTask(
         const position = await tx.task.count({
           where: { listId, columnId: column.id },
         });
-        return tx.task.create({
+        const task = await tx.task.create({
           data: {
             id: input.id,
             listId,
@@ -217,13 +272,27 @@ export async function createTask(
             title: input.title,
             description: input.description,
             priority: input.priority,
-            assigneeId: input.assigneeId,
+            typeId: input.typeId,
+            assignees: {
+              create: input.assigneeIds.map((id) => ({ userId: id })),
+            },
+            labels: { create: input.labelIds.map((labelId) => ({ labelId })) },
             dueDate: toDate(input.dueDate),
             position,
             createdById: userId,
           },
           select: taskSelect,
         });
+        await recordEvents(tx, [
+          {
+            taskId: task.id,
+            listId,
+            type: "CREATED",
+            to: column,
+            actorId: userId,
+          },
+        ]);
+        return task;
       },
     );
     return { task: toTask(result), boardVersion, created: true };
@@ -271,23 +340,55 @@ export async function updateTask(
     listId,
     expectedBoardVersion,
     "task:write",
-    async (tx) => {
+    async (tx, actor) => {
       // A task of another list is not found, even if the caller belongs to both.
       const task = await tx.task.findFirst({
         where: { id: taskId, listId },
-        select: { id: true },
+        select: {
+          blockedReason: true,
+          column: { select: { id: true, category: true } },
+        },
       });
       if (!task) throw notFound();
-      await assertAssignee(tx, listId, changes.assigneeId);
+      const { assigneeIds, labelIds, typeId, blockedReason, ...fields } =
+        changes;
+      await assertAssignees(tx, listId, assigneeIds);
+      await assertCatalog(tx, actor.workspaceId, typeId, labelIds);
 
-      return tx.task.update({
+      const updated = await tx.task.update({
         where: { id: taskId },
         data: {
-          ...changes,
-          dueDate: toDate(changes.dueDate),
+          ...fields,
+          dueDate: toDate(fields.dueDate),
+          typeId,
+          blockedReason,
+          // Replacing a set: the new ids are the whole truth.
+          assignees: assigneeIds && {
+            deleteMany: {},
+            create: assigneeIds.map((id) => ({ userId: id })),
+          },
+          labels: labelIds && {
+            deleteMany: {},
+            create: labelIds.map((id) => ({ labelId: id })),
+          },
         },
         select: taskSelect,
       });
+      // Blocking and unblocking are history; changing the reason of a blocked task is not.
+      const was = task.blockedReason !== null;
+      const is = blockedReason === undefined ? was : blockedReason !== null;
+      if (was !== is) {
+        await recordEvents(tx, [
+          {
+            taskId,
+            listId,
+            type: is ? "BLOCKED" : "UNBLOCKED",
+            to: task.column,
+            actorId: userId,
+          },
+        ]);
+      }
+      return updated;
     },
   );
   return { task: toTask(result), boardVersion };
@@ -349,12 +450,16 @@ export async function moveTask(
       async (tx) => {
         const task = await tx.task.findFirst({
           where: { id: taskId, listId },
-          select: { columnId: true, position: true },
+          select: {
+            columnId: true,
+            position: true,
+            column: { select: { id: true, category: true } },
+          },
         });
         if (!task) throw notFound();
         const column = await tx.boardColumn.findFirst({
           where: { id: columnId, listId },
-          select: { id: true },
+          select: { id: true, category: true },
         });
         if (!column)
           throw invalid(
@@ -411,11 +516,25 @@ export async function moveTask(
             data: { position: { increment: 1 } },
           });
         }
-        return tx.task.update({
+        const moved = await tx.task.update({
           where: { id: taskId },
           data: { columnId: column.id, position: toIndex },
           select: taskSelect,
         });
+        // Only a change of stage is history; reordering inside a stage is not.
+        if (!sameColumn) {
+          await recordEvents(tx, [
+            {
+              taskId,
+              listId,
+              type: moveEventType(task.column.category, column.category),
+              from: task.column,
+              to: column,
+              actorId: userId,
+            },
+          ]);
+        }
+        return moved;
       },
     );
     return { task: toTask(result), boardVersion };
