@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * TaskFlow design tokens. The full guide is docs/design.md.
+ * TaskFlow design tokens.
  *
  * Four colours, each with a few roles:
  *   Neutral  page, surface, subtle, line, control, fg, muted
@@ -106,7 +106,7 @@
   --color-success-soft: var(--success-soft);
 }
 
-/* Shared building blocks; see docs/design.md for when to use each. */
+/* Shared building blocks: buttons, fields, cards, dialog, badge, link, messages. */
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-fg shadow-sm hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-link disabled:cursor-not-allowed disabled:opacity-50;

@@ -14,9 +14,7 @@
 
 ## Technical decisions
 
-See [`docs/decisions.md`](docs/decisions.md).
-
-<!-- TODO(owner): short rationale per tool. -->
+<!-- TODO(owner): summary of the main decisions (the detailed records are kept outside the repository). -->
 
 ## Requirements
 
