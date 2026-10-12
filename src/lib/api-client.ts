@@ -1,3 +1,5 @@
+import { messages } from "@/lib/messages";
+
 type Failure = {
   ok: false;
   message: string;
@@ -33,15 +35,15 @@ export async function api(
       conflict,
       currentVersion: payload.error?.currentVersion,
       message: conflict
-        ? "The board changed in the meantime. The page was refreshed; try again."
-        : String(field ?? payload.error?.message ?? "Something went wrong"),
+        ? messages.errors.conflict
+        : String(field ?? payload.error?.message ?? messages.errors.generic),
     };
   } catch {
     return {
       ok: false,
       conflict: false,
       network: true,
-      message: "Could not reach the server. Check your connection and retry.",
+      message: messages.errors.network,
     };
   }
 }

@@ -99,6 +99,71 @@ describe("board filters (applied in SQL)", () => {
   });
 });
 
+describe("type, label and blocked filters", () => {
+  let typeId = "";
+  let labelId = "";
+  beforeAll(async () => {
+    const { workspaceId, listId: id } = await createListFor(world);
+    const type = await db.workItemType.findFirstOrThrow({
+      where: { workspaceId, name: "Bug" },
+    });
+    const label = await db.label.create({
+      data: { workspaceId, name: "later" },
+    });
+    typeId = type.id;
+    labelId = label.id;
+    const first = await db.boardColumn.findFirstOrThrow({
+      where: { listId: id, position: 0 },
+    });
+    const make = (title: string, extra: object) =>
+      db.task.create({
+        data: {
+          listId: id,
+          columnId: first.id,
+          title,
+          position: 10 + title.length,
+          createdById: world.owner.id,
+          ...extra,
+        },
+      });
+    await make("B", { typeId, blockedReason: "Waiting" });
+    await make("BB", { typeId, labels: { create: { labelId } } });
+    await make("BBB", {
+      labels: { create: { labelId } },
+      blockedReason: "Stuck",
+    });
+    await make("BBBB", {});
+    listOfThese = id;
+  });
+  let listOfThese = "";
+
+  const found = async (filter: Parameters<typeof getBoard>[2]) =>
+    (await getBoard(world.owner.id, listOfThese, filter)).columns
+      .flatMap((c) => c.tasks.map((t) => t.title))
+      .filter((t) => /^B+$/.test(t))
+      .sort();
+
+  it("filters by type, and 'none' finds the tasks without one", async () => {
+    expect(await found({ type: typeId })).toEqual(["B", "BB"]);
+    expect(await found({ type: "none" })).toEqual(["BBB", "BBBB"]);
+  });
+
+  it("filters by label", async () => {
+    expect(await found({ label: labelId })).toEqual(["BB", "BBB"]);
+  });
+
+  it("filters blocked and not blocked", async () => {
+    expect(await found({ blocked: "yes" })).toEqual(["B", "BBB"]);
+    expect(await found({ blocked: "no" })).toEqual(["BB", "BBBB"]);
+  });
+
+  it("combines them with each other", async () => {
+    expect(await found({ type: typeId, blocked: "yes" })).toEqual(["B"]);
+    expect(await found({ label: labelId, blocked: "no" })).toEqual(["BB"]);
+    expect(await found({ type: "none", label: labelId })).toEqual(["BBB"]);
+  });
+});
+
 describe("parseFilter", () => {
   it("keeps valid values and ignores invalid or repeated ones", () => {
     expect(

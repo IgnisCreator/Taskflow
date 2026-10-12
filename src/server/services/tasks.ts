@@ -125,6 +125,14 @@ export async function getBoard(
         : filter.assignee
           ? { some: { userId: filter.assignee } }
           : undefined,
+    typeId: filter.type === UNASSIGNED ? null : filter.type,
+    labels: filter.label ? { some: { labelId: filter.label } } : undefined,
+    blockedReason:
+      filter.blocked === "yes"
+        ? { not: null }
+        : filter.blocked === "no"
+          ? null
+          : undefined,
     OR: q
       ? [
           { title: { contains: q, mode: "insensitive" } },

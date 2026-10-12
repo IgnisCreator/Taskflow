@@ -14,10 +14,12 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { dropTarget, moveTask } from "@/lib/board-order";
 import { formatDueDate } from "@/lib/dates";
+import { messages } from "@/lib/messages";
+import { useVersionPolling } from "@/lib/use-version-polling";
 import {
   TaskDialog,
   type CatalogView,
@@ -27,7 +29,6 @@ import {
   type TaskView,
 } from "@/components/task-dialog";
 
-const POLL_MS = 10_000;
 // If the refresh after a move never arrives, drop the optimistic state after this long.
 const SETTLE_MS = 8_000;
 const columnDropId = (columnId: string) => `col:${columnId}`;
@@ -35,7 +36,8 @@ const columnDropId = (columnId: string) => `col:${columnId}`;
 type Notice = { kind: "info" | "error"; text: string };
 
 /**
- * Four fixed columns. Cards can be dragged (mouse, touch or keyboard) or moved from the task dialog.
+ * One column per stage of the list's flow. Cards can be dragged (mouse, touch or keyboard) or moved
+ * from the task dialog.
  *
  * A move shows at once (optimistic), is sent with the board version, and on any failure (conflict,
  * server error, lost connection) the optimistic order is dropped and the board is reloaded. Only one
@@ -78,45 +80,13 @@ export function Board({
   const busy = local !== null && local.base === columns;
   const shown = busy ? local.columns : columns;
 
-  const versionRef = useRef(boardVersion);
-  const busyRef = useRef(busy);
-  useEffect(() => {
-    versionRef.current = boardVersion;
-    busyRef.current = busy;
+  useVersionPolling({
+    listId,
+    boardVersion,
+    paused: busy,
+    onChange: () =>
+      setNotice({ kind: "info", text: messages.board.updatedByOthers }),
   });
-
-  useEffect(() => {
-    async function check() {
-      if (document.visibilityState !== "visible" || busyRef.current) return;
-      try {
-        const res = await fetch(`/api/lists/${listId}/version`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const latest = (await res.json()).boardVersion;
-        if (latest !== versionRef.current) {
-          setNotice({
-            kind: "info",
-            text: "The board was updated by someone else.",
-          });
-          router.refresh();
-        }
-      } catch {
-        // Offline: try again on the next tick.
-      }
-    }
-    const timer = setInterval(check, POLL_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void check();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", check);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", check);
-    };
-  }, [listId, router]);
 
   useEffect(() => {
     if (notice?.kind !== "info") return;
@@ -221,7 +191,7 @@ export function Board({
         }}
       >
         {filtered && shown.every((column) => column.tasks.length === 0) && (
-          <p className="notice">No tasks match these filters.</p>
+          <p className="notice">{messages.board.noMatches}</p>
         )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {shown.map((column) => (
@@ -313,9 +283,7 @@ function BoardColumn({
       {column.policy && <p className="text-xs text-muted">{column.policy}</p>}
       {over && (
         <p className="error text-xs">
-          Over the WIP limit ({count} of {column.wipLimit}). Too much work
-          started at once slows everything down: finish something before pulling
-          more in.
+          {messages.board.overLimit(count, column.wipLimit!)}
         </p>
       )}
       <ul className="space-y-2">
@@ -331,11 +299,11 @@ function BoardColumn({
         ))}
       </ul>
       {column.tasks.length === 0 && (
-        <p className="text-sm text-muted">No tasks</p>
+        <p className="text-sm text-muted">{messages.board.noTasks}</p>
       )}
       {canWrite && (
         <button type="button" className="btn-secondary w-full" onClick={onAdd}>
-          Add task
+          {messages.board.addTask}
         </button>
       )}
     </section>
