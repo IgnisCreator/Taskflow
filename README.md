@@ -52,6 +52,20 @@ npm run dev                  # http://localhost:3000
 | `npm run build`        | Production build                                                                                        |
 | `npm run test:e2e`     | Browser tests (Playwright); needs a build and PostgreSQL. First time: `npx playwright install chromium` |
 
+### Checks in Docker
+
+The same pipeline as CI runs in containers (Playwright 1.64.0 image with Node 24), so nothing but Docker is needed:
+
+```bash
+docker compose run --rm check             # clean clone of the current branch: lint, types, tests, build, E2E
+docker compose run --rm check my-branch   # any local branch
+docker compose run --rm tools npm ci      # once: install Linux packages for the working-tree container
+docker compose run --rm tools node scripts/create-db.mjs
+docker compose run --rm tools sh -c "npm run db:migrate && npm test"
+```
+
+They use throwaway databases (`taskflow_ci`, `taskflow_test`); `scripts/create-db.mjs` refuses any other name.
+
 ## SQL and indexes
 
 <!-- TODO(owner): queries, indexes and EXPLAIN output (arrives with TF-07). -->
