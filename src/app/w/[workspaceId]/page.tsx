@@ -3,8 +3,10 @@ import { ApiForm } from "@/components/api-form";
 import { TemplateSelect } from "@/components/template-select";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { roleLabel } from "@/lib/roles";
-import { loadUser, loadWorkspace } from "@/server/load";
+import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
+import { parseMetricsQuery } from "@/lib/validations/metrics";
+import { getSpaceMetrics } from "@/server/services/metrics";
 import { listTemplates } from "@/server/services/templates";
 
 export default async function WorkspacePage({
@@ -15,7 +17,16 @@ export default async function WorkspacePage({
   const user = await loadUser();
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const admin = can(workspace, "structure:manage");
-  const templates = await listTemplates(user.id, workspace.id);
+  const now = currentTime();
+  const last30 = parseMetricsQuery({}, now);
+  const [templates, summaries] = await Promise.all([
+    listTemplates(user.id, workspace.id),
+    Promise.all(
+      workspace.spaces.map((space) =>
+        getSpaceMetrics(user.id, space.id, last30, now),
+      ),
+    ),
+  ]);
 
   return (
     <WorkspaceShell workspace={workspace}>
@@ -33,7 +44,8 @@ export default async function WorkspacePage({
           </p>
         )}
         <ul className="grid gap-4 sm:grid-cols-2">
-          {workspace.spaces.map((space) => {
+          {workspace.spaces.map((space, index) => {
+            const summary = summaries[index]!;
             const lists = [
               ...space.lists,
               ...space.folders.flatMap((folder) => folder.lists),
@@ -44,6 +56,35 @@ export default async function WorkspacePage({
                   {space.name}
                   {space.isPrivate && <span className="badge">private</span>}
                 </h2>
+                <dl
+                  aria-label={`Last 30 days in ${space.name}`}
+                  className="grid grid-cols-3 gap-2 text-sm"
+                >
+                  <div>
+                    <dt className="text-muted">Finished</dt>
+                    <dd className="font-semibold">
+                      {summary.throughput.total}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">Median cycle</dt>
+                    <dd className="font-semibold">
+                      {summary.cycleTime.p50 === null
+                        ? "-"
+                        : `${summary.cycleTime.p50.toFixed(1)} days`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted">In progress</dt>
+                    <dd className="font-semibold">{summary.wip.total}</dd>
+                  </div>
+                </dl>
+                <Link
+                  href={`/spaces/${space.id}/metrics`}
+                  className="link block text-sm"
+                >
+                  Metrics of {space.name}
+                </Link>
                 {lists.length === 0 ? (
                   <p className="text-sm text-muted">No lists yet.</p>
                 ) : (

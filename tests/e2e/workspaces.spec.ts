@@ -51,7 +51,9 @@ test("an owner builds a private space with a folder and a list, and decides who 
   await other.addCookies(seed.member.cookies);
   const memberPage = await other.newPage();
   await memberPage.goto(`/w/${seed.workspaceId}`);
-  await expect(nav(memberPage).getByText("General")).toBeVisible();
+  await expect(
+    nav(memberPage).getByText("General", { exact: true }),
+  ).toBeVisible();
   await expect(nav(memberPage).getByText(/Hiring/)).toHaveCount(0);
   const listUrl = page.url();
   await memberPage.goto(listUrl);

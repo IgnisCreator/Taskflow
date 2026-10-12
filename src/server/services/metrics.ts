@@ -142,6 +142,8 @@ export async function getSpaceMetrics(
     const space = await tx.space.findUnique({
       where: { id: spaceId },
       select: {
+        name: true,
+        workspaceId: true,
         isPrivate: true,
         members: { where: { userId }, select: { userId: true } },
         workspace: {
@@ -183,6 +185,11 @@ export async function getSpaceMetrics(
       bucket: (_stageId, category) => category,
       order: CATEGORIES,
     });
-    return { scope: "space" as const, ...metrics, titles };
+    return {
+      scope: "space" as const,
+      space: { id: spaceId, name: space.name, workspaceId: space.workspaceId },
+      ...metrics,
+      titles,
+    };
   });
 }

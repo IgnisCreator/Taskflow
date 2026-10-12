@@ -57,10 +57,13 @@ export default async function ListPage({
               <p className="mt-1 text-muted">{list.description}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="badge normal-case">
               {roleLabel(workspace.roleLabels, list.role)}
             </span>
+            <Link href={`/lists/${list.id}/metrics`} className="btn-secondary">
+              Metrics
+            </Link>
             <Link href={`/lists/${list.id}/activity`} className="btn-secondary">
               Activity
             </Link>
