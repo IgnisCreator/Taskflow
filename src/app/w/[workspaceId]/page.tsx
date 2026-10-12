@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ApiForm } from "@/components/api-form";
+import { TemplateSelect } from "@/components/template-select";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { roleLabel } from "@/lib/roles";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
+import { listTemplates } from "@/server/services/templates";
 
 export default async function WorkspacePage({
   params,
@@ -13,6 +15,7 @@ export default async function WorkspacePage({
   const user = await loadUser();
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const admin = can(workspace, "structure:manage");
+  const templates = await listTemplates(user.id, workspace.id);
 
   return (
     <WorkspaceShell workspace={workspace}>
@@ -72,6 +75,12 @@ export default async function WorkspacePage({
                         className="input"
                       />
                     </label>
+                    <TemplateSelect
+                      name="templateId"
+                      label="Workflow"
+                      none="Default for this space or folder"
+                      templates={templates}
+                    />
                     {space.folders.length > 0 && (
                       <label className="field">
                         Folder

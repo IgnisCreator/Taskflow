@@ -6,6 +6,7 @@ import { ROLES } from "@/lib/validations/workspaces";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
 import { listMembers } from "@/server/services/members";
+import { listTemplates } from "@/server/services/templates";
 
 export default async function WorkspaceSettingsPage({
   params,
@@ -15,6 +16,7 @@ export default async function WorkspaceSettingsPage({
   const user = await loadUser();
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const members = await listMembers(user.id, workspace.id);
+  const templates = await listTemplates(user.id, workspace.id);
   const url = `/api/workspaces/${workspace.id}`;
 
   return (
@@ -47,6 +49,55 @@ export default async function WorkspaceSettingsPage({
           <p className="card text-muted">
             Only the owner and admins can change these settings.
           </p>
+        )}
+        {can(workspace, "structure:manage") && (
+          <section className="card space-y-3">
+            <h2 className="text-lg font-semibold">Flow templates</h2>
+            <p className="text-sm text-muted">
+              Flows saved from a list (use &ldquo;Save as template&rdquo; on a
+              list workflow page). The system templates are always available and
+              cannot be edited.
+            </p>
+            {templates.organisation.length === 0 && (
+              <p className="text-sm text-muted">No templates saved yet.</p>
+            )}
+            <ul className="space-y-3">
+              {templates.organisation.map((template) => (
+                <li
+                  key={template.ref}
+                  className="flex flex-wrap items-end gap-2 border-t border-line pt-3"
+                >
+                  <ApiForm
+                    method="PATCH"
+                    url={`/api/templates/${template.ref}`}
+                    submit="Rename"
+                    className="flex flex-1 flex-wrap items-end gap-2"
+                  >
+                    <label className="field flex-1">
+                      Template name
+                      <input
+                        name="name"
+                        required
+                        maxLength={60}
+                        defaultValue={template.name}
+                        className="input"
+                      />
+                    </label>
+                  </ApiForm>
+                  <span className="text-sm text-muted">
+                    {template.stages.length} stages
+                  </span>
+                  <ApiForm
+                    method="DELETE"
+                    url={`/api/templates/${template.ref}`}
+                    submit={`Delete ${template.name}`}
+                    danger
+                    className="flex items-end gap-2"
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         <MembersPanel
           workspaceId={workspace.id}

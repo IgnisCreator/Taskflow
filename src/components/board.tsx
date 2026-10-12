@@ -279,6 +279,9 @@ function BoardColumn({
   onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnDropId(column.id) });
+  // Over the limit counts every task of the stage, also those a filter hides.
+  const count = filtered ? column.total : column.tasks.length;
+  const over = column.wipLimit !== null && count > column.wipLimit;
   return (
     <section
       ref={setNodeRef}
@@ -294,8 +297,17 @@ function BoardColumn({
           {filtered
             ? `${column.tasks.length} of ${column.total}`
             : column.tasks.length}
+          {column.wipLimit !== null && ` · limit ${column.wipLimit}`}
         </span>
       </h2>
+      {column.policy && <p className="text-xs text-muted">{column.policy}</p>}
+      {over && (
+        <p className="error text-xs">
+          Over the WIP limit ({count} of {column.wipLimit}). Too much work
+          started at once slows everything down: finish something before pulling
+          more in.
+        </p>
+      )}
       <ul className="space-y-2">
         {column.tasks.map((task) => (
           <li key={task.id}>

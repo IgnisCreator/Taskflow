@@ -6,8 +6,7 @@ import type {
 import { db } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { readListAccess, withListLock, withSpaceLock } from "@/server/locks";
-
-const DEFAULT_COLUMNS = ["To do", "In progress", "In review", "Done"];
+import { flowForNewList } from "@/server/services/templates";
 
 const listSelect = {
   id: true,
@@ -19,35 +18,54 @@ const listSelect = {
   createdAt: true,
 } as const;
 
-/** The list with its four default columns, in a space (optionally one of its folders). */
+/**
+ * The list in a space (optionally one of its folders), with the stages of its flow: the template
+ * asked for, else the folder default, else the space default, else the generic one.
+ */
 export async function createList(userId: string, input: CreateListInput) {
-  const { spaceId, folderId, ...data } = input;
-  return withSpaceLock(userId, spaceId, "structure:manage", async (tx) => {
-    if (folderId) {
-      const folder = await tx.folder.findFirst({
-        where: { id: folderId, spaceId },
-        select: { id: true },
+  const { spaceId, folderId, templateId, ...data } = input;
+  return withSpaceLock(
+    userId,
+    spaceId,
+    "structure:manage",
+    async (tx, { workspaceId }) => {
+      const space = await tx.space.findUniqueOrThrow({
+        where: { id: spaceId },
+        select: { defaultTemplate: true },
       });
-      if (!folder) {
+      const folder = folderId
+        ? await tx.folder.findFirst({
+            where: { id: folderId, spaceId },
+            select: { defaultTemplate: true },
+          })
+        : null;
+      if (folderId && !folder) {
         throw new ApiError(
           400,
           "INVALID_FOLDER",
           "The folder is not part of this space",
         );
       }
-    }
-    return tx.list.create({
-      data: {
-        ...data,
-        spaceId,
-        folderId,
-        columns: {
-          create: DEFAULT_COLUMNS.map((name, position) => ({ name, position })),
+      const flow = await flowForNewList(
+        tx,
+        workspaceId,
+        space,
+        folder,
+        templateId,
+      );
+      return tx.list.create({
+        data: {
+          ...data,
+          spaceId,
+          folderId,
+          columns: {
+            create: flow.map((stage, position) => ({ ...stage, position })),
+          },
         },
-      },
-      select: listSelect,
-    });
-  });
+        select: listSelect,
+      });
+    },
+  );
 }
 
 /** A list the caller cannot see is reported as missing (null), never as forbidden. */

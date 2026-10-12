@@ -488,6 +488,7 @@ describe("the board snapshot", () => {
       "In progress",
       "In review",
       "Done",
+      "Discarded",
     ]);
     expect(
       board.columns[1].tasks.map((t: { title: string }) => t.title),

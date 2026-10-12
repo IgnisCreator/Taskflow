@@ -118,6 +118,10 @@ export async function getBoard(
               id: true,
               name: true,
               position: true,
+              category: true,
+              isCommitmentPoint: true,
+              wipLimit: true,
+              policy: true,
               _count: { select: { tasks: true } },
               tasks: {
                 where,

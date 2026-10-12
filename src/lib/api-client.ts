@@ -12,7 +12,7 @@ type Success = { ok: true; data: unknown };
 
 /** Browser-side JSON call to our API. Same-origin fetches carry the Origin header the server requires. */
 export async function api(
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   url: string,
   body: unknown,
 ): Promise<Success | Failure> {

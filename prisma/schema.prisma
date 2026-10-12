@@ -89,6 +89,15 @@ enum WorkspaceRole {
   GUEST
 }
 
+/// What a stage means for the metrics. The order is BACKLOG, ACTIVE or WAITING, DONE, DISCARDED.
+enum StageCategory {
+  BACKLOG
+  ACTIVE
+  WAITING
+  DONE
+  DISCARDED
+}
+
 enum Priority {
   LOW
   MEDIUM
@@ -97,14 +106,29 @@ enum Priority {
 
 /// The organisation. Everything below it (spaces, folders, lists, tasks) belongs to exactly one.
 model Workspace {
-  id         String            @id @default(uuid())
+  id         String             @id @default(uuid())
   name       String
   /// Display names chosen by the workspace for each role, e.g. {"GUEST": "Client"}; permissions never change.
-  roleLabels Json              @default("{}")
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  roleLabels Json               @default("{}")
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
   members    WorkspaceMember[]
   spaces     Space[]
+  templates  WorkflowTemplate[]
+}
+
+/// A flow saved by the organisation from one of its lists. The system templates live in the code.
+model WorkflowTemplate {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  /// Ordered stages: [{ name, category, wipLimit, policy, isCommitmentPoint }], validated on write.
+  stages      Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model WorkspaceMember {
@@ -122,15 +146,17 @@ model WorkspaceMember {
 /// An area of work (e.g. Software, Support). Private spaces are visible to OWNER/ADMIN and to the
 /// members listed in SpaceMember; public ones to every MEMBER too. GUESTs only see spaces they are listed in.
 model Space {
-  id          String        @id @default(uuid())
-  workspaceId String
-  name        String
-  isPrivate   Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  members     SpaceMember[]
-  folders     Folder[]
-  lists       List[]
+  id              String        @id @default(uuid())
+  workspaceId     String
+  name            String
+  isPrivate       Boolean       @default(false)
+  /// Flow copied into new lists: "system:<key>" or a WorkflowTemplate id. Null means the folder's or "system:generic".
+  defaultTemplate String?
+  createdAt       DateTime      @default(now())
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members         SpaceMember[]
+  folders         Folder[]
+  lists           List[]
 
   @@index([workspaceId])
 }
@@ -149,12 +175,14 @@ model SpaceMember {
 
 /// Optional grouping of lists inside a space.
 model Folder {
-  id        String   @id @default(uuid())
-  spaceId   String
-  name      String
-  createdAt DateTime @default(now())
-  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  lists     List[]
+  id              String   @id @default(uuid())
+  spaceId         String
+  name            String
+  /// Same as Space.defaultTemplate; wins over the space's.
+  defaultTemplate String?
+  createdAt       DateTime @default(now())
+  space           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  lists           List[]
 
   @@index([spaceId])
 }
@@ -179,13 +207,21 @@ model List {
   @@index([folderId])
 }
 
+/// A stage of a list's flow (shown as a column). Each list owns its stages, copied from a template.
 model BoardColumn {
-  id       String @id @default(uuid())
-  listId   String
-  name     String
-  position Int
-  list     List   @relation(fields: [listId], references: [id], onDelete: Cascade)
-  tasks    Task[]
+  id                String        @id @default(uuid())
+  listId            String
+  name              String
+  position          Int
+  category          StageCategory
+  /// Where the cycle time starts. Exactly one per list, on an ACTIVE stage.
+  isCommitmentPoint Boolean       @default(false)
+  /// Advisory limit of tasks in the stage: it raises an alert, never blocks.
+  wipLimit          Int?
+  /// Short text: what it takes to enter or leave the stage.
+  policy            String?
+  list              List          @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tasks             Task[]
 
   @@unique([listId, id])
   @@unique([listId, position])

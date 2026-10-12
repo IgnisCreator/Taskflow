@@ -43,12 +43,17 @@ export default async function ListPage({
               {roleLabel(workspace.roleLabels, list.role)}
             </span>
             {can(list, "structure:manage") && (
-              <Link
-                href={`/lists/${list.id}/settings`}
-                className="btn-secondary"
-              >
-                List settings
-              </Link>
+              <>
+                <Link href={`/lists/${list.id}/flow`} className="btn-secondary">
+                  Workflow
+                </Link>
+                <Link
+                  href={`/lists/${list.id}/settings`}
+                  className="btn-secondary"
+                >
+                  List settings
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -63,6 +68,8 @@ export default async function ListPage({
             id: column.id,
             name: column.name,
             total: column.total,
+            wipLimit: column.wipLimit,
+            policy: column.policy,
             tasks: column.tasks.map((task) => ({
               id: task.id,
               columnId: task.columnId,

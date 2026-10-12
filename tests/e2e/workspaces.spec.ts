@@ -34,9 +34,13 @@ test("an owner builds a private space with a folder and a list, and decides who 
   await page.getByRole("button", { name: "Add folder" }).click();
   await expect(page.getByLabel("Folder name")).toHaveValue("2026");
   await page.goto(`/w/${seed.workspaceId}`);
-  const hiring = page.locator("li.card", { hasText: "Hiring" });
+  const hiring = page.locator("li.card").filter({
+    has: page.getByRole("heading", { name: "Hiring" }),
+  });
   await hiring.getByLabel("New list").fill("Candidates");
-  await hiring.getByLabel("Folder").selectOption({ label: "2026" });
+  await hiring
+    .locator('select[name="folderId"]')
+    .selectOption({ label: "2026" });
   await hiring.getByRole("button", { name: "Create list" }).click();
   await expect(page).toHaveURL(/\/lists\//);
   await expect(page.getByRole("heading", { name: "Candidates" })).toBeVisible();

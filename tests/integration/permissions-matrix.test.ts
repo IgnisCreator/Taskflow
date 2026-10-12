@@ -22,6 +22,10 @@ const folder = await import("@/app/api/folders/[folderId]/route");
 const lists = await import("@/app/api/lists/route");
 const list = await import("@/app/api/lists/[listId]/route");
 const board = await import("@/app/api/lists/[listId]/board/route");
+const flow = await import("@/app/api/lists/[listId]/flow/route");
+const templates =
+  await import("@/app/api/workspaces/[workspaceId]/templates/route");
+const template = await import("@/app/api/templates/[templateId]/route");
 const tasks = await import("@/app/api/lists/[listId]/tasks/route");
 const task = await import("@/app/api/lists/[listId]/tasks/[taskId]/route");
 const move = await import("@/app/api/lists/[listId]/tasks/[taskId]/move/route");
@@ -42,11 +46,12 @@ const KINDS: Kind[] = [
 ];
 
 type Fixture = Awaited<ReturnType<typeof createListFor>>;
-/** The fixture plus the ids of the list's first two columns. */
+/** The fixture plus the ids of the list's first two columns and of an organisation template. */
 type Ctx = Fixture & {
   world: World;
   actor: Actor | null;
   columns: [string, string];
+  templateId: string;
 };
 type Call = (ctx: Ctx) => Promise<Response>;
 type Handler<P> = (
@@ -107,6 +112,56 @@ const ta =
     params: { listId: c.listId, taskId: c.taskId },
   });
 const v0 = { expectedBoardVersion: 0 };
+
+/** The list's stages as the flow editor sends them back, with the first one renamed. */
+const onFlow: Call = async (c) => {
+  const rows = await db.boardColumn.findMany({
+    where: { listId: c.listId },
+    orderBy: { position: "asc" },
+  });
+  const stages = rows.map(
+    ({ id, name, category, wipLimit, policy, isCommitmentPoint }, i) => ({
+      id,
+      name: i === 0 ? "Inbox" : name,
+      category,
+      wipLimit,
+      policy,
+      isCommitmentPoint,
+    }),
+  );
+  return callAs(
+    c.actor,
+    flow.PUT,
+    send("PUT", `/api/lists/${c.listId}/flow`, { ...v0, stages }),
+    { listId: c.listId },
+  );
+};
+
+const saveTemplate = (c: Ctx) =>
+  callAs(
+    c.actor,
+    templates.POST,
+    send("POST", `/api/workspaces/${c.workspaceId}/templates`, {
+      name: "Saved",
+      fromListId: c.listId,
+    }),
+    { workspaceId: c.workspaceId },
+  );
+
+/** A call on the fixture template (created in setUp, so the snapshot taken before the call includes it). */
+const onTemplate =
+  (
+    handler: typeof template.PATCH | typeof template.DELETE,
+    method: string,
+    body?: object,
+  ): Call =>
+  (c) =>
+    callAs(
+      c.actor,
+      handler,
+      send(method, `/api/templates/${c.templateId}`, body),
+      { templateId: c.templateId },
+    );
 
 // [route, call, expected status per caller (owner, admin, member, guest, stranger, anonymous)]
 const matrix: [string, Call, number[]][] = [
@@ -300,6 +355,24 @@ const matrix: [string, Call, number[]][] = [
     route(list.DELETE, "DELETE", li(), () => v0),
     [204, 204, 403, 403, 404, 401],
   ],
+  // Workflows and templates: members read, OWNER and ADMIN change.
+  ["PUT flow", onFlow, [200, 200, 403, 403, 404, 401]],
+  [
+    "GET templates",
+    route(templates.GET, "GET", ws("/templates")),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  ["POST template", saveTemplate, [201, 201, 403, 403, 404, 401]],
+  [
+    "PATCH template",
+    onTemplate(template.PATCH, "PATCH", { name: "Renamed" }),
+    [200, 200, 403, 403, 404, 401],
+  ],
+  [
+    "DELETE template",
+    onTemplate(template.DELETE, "DELETE"),
+    [204, 204, 403, 403, 404, 401],
+  ],
   // Tasks: owner, admin and member write; a guest only reads.
   [
     "GET board",
@@ -353,7 +426,14 @@ async function setUp(options?: { privateSpace?: boolean }) {
     where: { listId: fixture.listId },
     orderBy: { position: "asc" },
   });
-  return { ...fixture, columns: [first!.id, second!.id] as [string, string] };
+  const { id: templateId } = await db.workflowTemplate.create({
+    data: { workspaceId: fixture.workspaceId, name: "Mine", stages: [] },
+  });
+  return {
+    ...fixture,
+    columns: [first!.id, second!.id] as [string, string],
+    templateId,
+  };
 }
 
 beforeAll(async () => {

@@ -19,6 +19,9 @@ export type ColumnView = {
   id: string;
   name: string;
   total: number;
+  /** Advisory limit of tasks in the stage (an alert, never a block), and what it takes to enter or leave it. */
+  wipLimit: number | null;
+  policy: string | null;
   tasks: TaskView[];
 };
 export type MemberView = { userId: string; name: string };

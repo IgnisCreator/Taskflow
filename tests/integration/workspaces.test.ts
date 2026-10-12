@@ -284,7 +284,7 @@ describe("role labels", () => {
 });
 
 describe("lists", () => {
-  it("are created with four ordered columns", async () => {
+  it("are created with the generic flow: to do, in progress, done, discarded", async () => {
     const { spaceId } = await createListFor(world);
     const res = await callAs(
       world.admin,
@@ -297,11 +297,13 @@ describe("lists", () => {
       where: { listId: id },
       orderBy: { position: "asc" },
     });
-    expect(columns.map((c) => [c.name, c.position])).toEqual([
-      ["To do", 0],
-      ["In progress", 1],
-      ["In review", 2],
-      ["Done", 3],
+    expect(
+      columns.map((c) => [c.name, c.category, c.isCommitmentPoint]),
+    ).toEqual([
+      ["To do", "BACKLOG", false],
+      ["In progress", "ACTIVE", true],
+      ["Done", "DONE", false],
+      ["Discarded", "DISCARDED", false],
     ]);
   });
 
