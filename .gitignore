@@ -15,3 +15,6 @@ next-env.d.ts
 
 .DS_Store
 npm-debug.log*
+
+# Working notes live outside the repository (only the README is published).
+docs/
