@@ -50,6 +50,7 @@ export async function createUser(label: string): Promise<TestUser> {
 }
 
 export const COLUMNS = ["To do", "In progress", "In review", "Done"];
+const CATEGORIES = ["BACKLOG", "ACTIVE", "ACTIVE", "DONE"] as const;
 
 /**
  * An owner and a member in a workspace with a public space holding a list with Alpha, Bravo, Charlie
@@ -76,7 +77,12 @@ export async function seedBoard() {
       name: "E2E list",
       spaceId: workspace.spaces[0]!.id,
       columns: {
-        create: COLUMNS.map((name, position) => ({ name, position })),
+        create: COLUMNS.map((name, position) => ({
+          name,
+          position,
+          category: CATEGORIES[position]!,
+          isCommitmentPoint: position === 1,
+        })),
       },
     },
     include: { columns: { orderBy: { position: "asc" } } },

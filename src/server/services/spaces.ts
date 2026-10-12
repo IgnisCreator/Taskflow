@@ -6,9 +6,17 @@ import {
   withSpaceLock,
   withWorkspaceLock,
   type Tx,
+  type WorkspaceActor,
 } from "@/server/locks";
 
-const spaceSelect = { id: true, name: true, isPrivate: true } as const;
+import { assertTemplate } from "@/server/services/templates";
+
+const spaceSelect = {
+  id: true,
+  name: true,
+  isPrivate: true,
+  defaultTemplate: true,
+} as const;
 
 /**
  * What the settings page of a space needs: the space, its folders, who is listed in it and the
@@ -27,7 +35,7 @@ export async function getSpaceSettings(userId: string, spaceId: string) {
       workspaceId: true,
       folders: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: { id: true, name: true },
+        select: { id: true, name: true, defaultTemplate: true },
       },
       members: { select: { userId: true } },
       workspace: {
@@ -50,6 +58,7 @@ export async function getSpaceSettings(userId: string, spaceId: string) {
     id: space.id,
     name: space.name,
     isPrivate: space.isPrivate,
+    defaultTemplate: space.defaultTemplate,
     workspaceId: space.workspaceId,
     folders: space.folders,
     people: space.workspace.members.map((m) => ({
@@ -77,14 +86,26 @@ export async function createSpace(
 export async function updateSpace(
   userId: string,
   spaceId: string,
-  changes: { name?: string; isPrivate?: boolean },
+  changes: {
+    name?: string;
+    isPrivate?: boolean;
+    defaultTemplate?: string | null;
+  },
 ) {
-  return withSpaceLock(userId, spaceId, "structure:manage", (tx) =>
-    tx.space.update({
-      where: { id: spaceId },
-      data: changes,
-      select: spaceSelect,
-    }),
+  return withSpaceLock(
+    userId,
+    spaceId,
+    "structure:manage",
+    async (tx, { workspaceId }) => {
+      if (changes.defaultTemplate) {
+        await assertTemplate(tx, workspaceId, changes.defaultTemplate);
+      }
+      return tx.space.update({
+        where: { id: spaceId },
+        data: changes,
+        select: spaceSelect,
+      });
+    },
   );
 }
 
@@ -154,18 +175,21 @@ export async function createFolder(
   );
 }
 
-export async function renameFolder(
+export async function updateFolder(
   userId: string,
   folderId: string,
-  name: string,
+  changes: { name?: string; defaultTemplate?: string | null },
 ) {
-  return withFolder(userId, folderId, (tx) =>
-    tx.folder.update({
+  return withFolder(userId, folderId, async (tx, { workspaceId }) => {
+    if (changes.defaultTemplate) {
+      await assertTemplate(tx, workspaceId, changes.defaultTemplate);
+    }
+    return tx.folder.update({
       where: { id: folderId },
-      data: { name },
-      select: { id: true, name: true },
-    }),
-  );
+      data: changes,
+      select: { id: true, name: true, defaultTemplate: true },
+    });
+  });
 }
 
 /** Deletes the folder with its lists and their tasks (cascade). */
@@ -179,7 +203,7 @@ export async function deleteFolder(userId: string, folderId: string) {
 async function withFolder<T>(
   userId: string,
   folderId: string,
-  work: (tx: Tx) => Promise<T>,
+  work: (tx: Tx, actor: WorkspaceActor) => Promise<T>,
 ) {
   const folder = await db.folder.findUnique({
     where: { id: folderId },

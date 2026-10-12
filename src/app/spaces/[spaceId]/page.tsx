@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { ApiForm } from "@/components/api-form";
 import { SpaceAccess } from "@/components/space-access";
+import { TemplateSelect } from "@/components/template-select";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { getSpaceSettings } from "@/server/services/spaces";
+import { listTemplates } from "@/server/services/templates";
 
 /** Settings of one space; only OWNER and ADMIN reach it (anyone else gets 404). */
 export default async function SpacePage({
@@ -15,6 +17,7 @@ export default async function SpacePage({
   const space = await getSpaceSettings(user.id, (await params).spaceId);
   if (!space) notFound();
   const workspace = await loadWorkspace(user.id, space.workspaceId);
+  const templates = await listTemplates(user.id, space.workspaceId);
   const url = `/api/spaces/${space.id}`;
 
   return (
@@ -47,6 +50,26 @@ export default async function SpacePage({
           </label>
         </ApiForm>
 
+        <ApiForm
+          method="PATCH"
+          url={url}
+          submit="Save default workflow"
+          className="card space-y-3"
+        >
+          <h2 className="text-lg font-semibold">Default workflow</h2>
+          <p className="text-sm text-muted">
+            New lists in this space start with this flow, unless their folder
+            has its own default or you pick another one when creating them.
+          </p>
+          <TemplateSelect
+            name="defaultTemplate"
+            label="Workflow"
+            none="Generic: to do, in progress, done, discarded"
+            templates={templates}
+            value={space.defaultTemplate}
+          />
+        </ApiForm>
+
         <SpaceAccess spaceId={space.id} people={space.people} />
 
         <section className="card space-y-3">
@@ -76,6 +99,20 @@ export default async function SpacePage({
                       className="input"
                     />
                   </label>
+                </ApiForm>
+                <ApiForm
+                  method="PATCH"
+                  url={`/api/folders/${folder.id}`}
+                  submit="Save workflow"
+                  className="flex flex-wrap items-end gap-2"
+                >
+                  <TemplateSelect
+                    name="defaultTemplate"
+                    label={`Default workflow of ${folder.name}`}
+                    none="Same as the space"
+                    templates={templates}
+                    value={folder.defaultTemplate}
+                  />
                 </ApiForm>
                 <ApiForm
                   method="DELETE"

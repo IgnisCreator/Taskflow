@@ -19,7 +19,14 @@ export async function createWorld() {
   };
 }
 
-const COLUMNS = ["To do", "In progress", "In review", "Done"];
+/** A valid flow with one extra stage ("In review"); the commitment point is "In progress". */
+export const STAGES = [
+  { name: "To do", category: "BACKLOG" },
+  { name: "In progress", category: "ACTIVE", isCommitmentPoint: true },
+  { name: "In review", category: "ACTIVE" },
+  { name: "Done", category: "DONE" },
+  { name: "Discarded", category: "DISCARDED" },
+] as const;
 
 /**
  * A fresh workspace with every role present. Its first space ("General", public) lists the guest, so
@@ -55,7 +62,7 @@ export async function createListFor(
       spaceId: space.id,
       name: "Fixture list",
       columns: {
-        create: COLUMNS.map((name, position) => ({ name, position })),
+        create: STAGES.map((stage, position) => ({ ...stage, position })),
       },
     },
     include: { columns: { orderBy: { position: "asc" } } },
@@ -85,6 +92,7 @@ export async function snapshot(workspaceId: string) {
     where: { id: workspaceId },
     include: {
       members: { orderBy: { userId: "asc" } },
+      templates: { orderBy: { id: "asc" } },
       spaces: {
         orderBy: { id: "asc" },
         include: {

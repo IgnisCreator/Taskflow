@@ -56,19 +56,41 @@ export const createSpaceSchema = z.strictObject({
   isPrivate: z.boolean().default(false),
 });
 
+/** "system:<key>" or the id of one of the workspace templates; null clears the default. */
+const templateRef = z.string().min(1).max(100).nullable();
+
 export const updateSpaceSchema = z
-  .strictObject({ name: name.optional(), isPrivate: z.boolean().optional() })
-  .refine((v) => v.name !== undefined || v.isPrivate !== undefined, {
-    message: "Provide a name or the privacy",
-  });
+  .strictObject({
+    name: name.optional(),
+    isPrivate: z.boolean().optional(),
+    defaultTemplate: templateRef.optional(),
+  })
+  .refine(
+    (v) =>
+      v.name !== undefined ||
+      v.isPrivate !== undefined ||
+      v.defaultTemplate !== undefined,
+    { message: "Provide a name, the privacy or a default template" },
+  );
 
 export const spaceMemberSchema = z.strictObject({ userId: id });
 
 export const folderSchema = z.strictObject({ name });
 
+export const updateFolderSchema = z
+  .strictObject({
+    name: name.optional(),
+    defaultTemplate: templateRef.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.defaultTemplate !== undefined, {
+    message: "Provide a name or a default template",
+  });
+
 export const createListSchema = z.strictObject({
   spaceId: id,
   folderId: id.nullable().default(null),
+  /** Flow of the new list; without it, the folder or space default (else generic). */
+  templateId: id.nullable().default(null),
   name,
   description: description.optional().transform((value) => value ?? null),
 });
