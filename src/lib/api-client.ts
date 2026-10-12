@@ -1,7 +1,7 @@
 type Failure = {
   ok: false;
   message: string;
-  /** True for BOARD_CONFLICT: someone else changed the project first. */
+  /** True for BOARD_CONFLICT: someone else changed the board first. */
   conflict: boolean;
   /** The server's current board version, present on a conflict. */
   currentVersion?: number;
@@ -33,7 +33,7 @@ export async function api(
       conflict,
       currentVersion: payload.error?.currentVersion,
       message: conflict
-        ? "The project changed in the meantime. The page was refreshed; try again."
+        ? "The board changed in the meantime. The page was refreshed; try again."
         : String(field ?? payload.error?.message ?? "Something went wrong"),
     };
   } catch {

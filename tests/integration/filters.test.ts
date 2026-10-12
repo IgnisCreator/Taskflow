@@ -1,22 +1,22 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { UNASSIGNED, parseFilter } from "@/lib/validations/filters";
 import { cleanupTestData } from "../helpers/actors";
-import { createProjectFor, createWorld, type World } from "../helpers/world";
+import { createListFor, createWorld, type World } from "../helpers/world";
 
 const { db } = await import("@/server/db");
 const { getBoard } = await import("@/server/services/tasks");
 
 let world: World;
-let projectId: string;
+let listId: string;
 beforeAll(async () => {
   await cleanupTestData();
   world = await createWorld();
-  ({ projectId } = await createProjectFor(world)); // "Assigned to member", MEDIUM, in column 0
+  ({ listId } = await createListFor(world)); // "Assigned to member", MEDIUM, in column 0
   const [first, second] = await db.boardColumn.findMany({
-    where: { projectId },
+    where: { listId },
     orderBy: { position: "asc" },
   });
-  const base = { projectId, createdById: world.owner.id };
+  const base = { listId, createdById: world.owner.id };
   await db.task.createMany({
     data: [
       {
@@ -48,7 +48,7 @@ afterAll(cleanupTestData);
 
 /** Titles that pass the filter, column by column. */
 const titles = async (filter: Parameters<typeof getBoard>[2]) =>
-  (await getBoard(world.owner.id, projectId, filter)).columns.map((c) =>
+  (await getBoard(world.owner.id, listId, filter)).columns.map((c) =>
     c.tasks.map((t) => t.title),
   );
 
@@ -89,7 +89,7 @@ describe("board filters (applied in SQL)", () => {
   });
 
   it("each column reports its total regardless of the filter", async () => {
-    const { columns } = await getBoard(world.owner.id, projectId, {
+    const { columns } = await getBoard(world.owner.id, listId, {
       priority: "LOW",
     });
     expect(columns.map((c) => [c.tasks.length, c.total]).slice(0, 2)).toEqual([

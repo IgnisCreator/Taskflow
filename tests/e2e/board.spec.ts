@@ -59,7 +59,7 @@ const moveAnswered = (page: Page) =>
 const alert = (page: Page) => page.locator('p[role="alert"]');
 const status = (page: Page) => page.locator('p[role="status"]');
 
-const open = (page: Page) => page.goto(`/projects/${seed.projectId}`);
+const open = (page: Page) => page.goto(`/lists/${seed.listId}`);
 
 test("dragging a task onto another one puts it in that place and survives a reload", async ({
   page,
@@ -78,7 +78,7 @@ test("dragging a task onto another one puts it in that place and survives a relo
   await expect.poll(() => domBoard(page)).toEqual(expected);
   await page.reload();
   expect(await domBoard(page)).toEqual(expected);
-  expect(await serverBoard(seed.projectId, seed.owner)).toEqual(expected);
+  expect(await serverBoard(seed.listId, seed.owner)).toEqual(expected);
 });
 
 test("dropping on an empty column moves the task there", async ({ page }) => {
@@ -114,7 +114,7 @@ test("a task can be moved from its dialog, without dragging", async ({
       "In review": [],
       Done: ["Charlie"],
     });
-  expect(await serverBoard(seed.projectId, seed.owner)).toEqual(
+  expect(await serverBoard(seed.listId, seed.owner)).toEqual(
     await domBoard(page),
   );
 });
@@ -149,7 +149,7 @@ for (const [name, fail] of Object.entries(failures)) {
     await expect(alert(page)).toBeVisible();
     await expect
       .poll(async () => domBoard(page))
-      .toEqual(await serverBoard(seed.projectId, seed.owner));
+      .toEqual(await serverBoard(seed.listId, seed.owner));
     expect(await domBoard(page)).toEqual(before); // the failed move changed nothing
 
     await page.unroute("**/tasks/*/move");
@@ -167,14 +167,14 @@ test("a conflict reloads the board to what the server has and says so", async ({
 }) => {
   await open(page);
   // Someone else moves a task behind this page's back, so the page's version is now stale.
-  await moveAs(seed.member, seed.projectId, "Delta", "To do", 0);
+  await moveAs(seed.member, seed.listId, "Delta", "To do", 0);
 
   await drag(page, "Alpha", card(page, "Delta"));
 
   await expect(alert(page)).toContainText("changed");
   await expect
     .poll(async () => domBoard(page))
-    .toEqual(await serverBoard(seed.projectId, seed.owner));
+    .toEqual(await serverBoard(seed.listId, seed.owner));
   expect((await domBoard(page))["To do"]?.[0]).toBe("Delta");
 });
 
@@ -184,12 +184,12 @@ test("the board picks up another user's change without a reload", async ({
   await page.clock.install();
   await open(page);
 
-  await moveAs(seed.member, seed.projectId, "Charlie", "Done", 0);
+  await moveAs(seed.member, seed.listId, "Charlie", "Done", 0);
   await page.clock.fastForward(11_000); // past one 10-second check
 
   await expect
     .poll(async () => domBoard(page))
-    .toEqual(await serverBoard(seed.projectId, seed.owner));
+    .toEqual(await serverBoard(seed.listId, seed.owner));
   expect((await domBoard(page)).Done).toEqual(["Charlie"]);
   await expect(status(page)).toContainText("updated");
 });
@@ -220,7 +220,7 @@ test("an edit made while someone else changed the board is kept, flagged, and sa
   await dialog.getByLabel("Title").fill("Alpha renamed");
 
   // Someone else changes the board while this dialog is open.
-  await moveAs(seed.member, seed.projectId, "Delta", "To do", 0);
+  await moveAs(seed.member, seed.listId, "Delta", "To do", 0);
 
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toContainText(
@@ -231,7 +231,7 @@ test("an edit made while someone else changed the board is kept, flagged, and sa
   await dialog.getByRole("button", { name: "Save" }).click(); // the intent, repeated knowingly
   await expect(dialog).toBeHidden();
   await expect(card(page, "Alpha renamed")).toBeVisible();
-  expect((await serverBoard(seed.projectId, seed.owner))["To do"]).toContain(
+  expect((await serverBoard(seed.listId, seed.owner))["To do"]).toContain(
     "Alpha renamed",
   );
 });
@@ -259,7 +259,7 @@ test("keyboard only: filter, open a task and move it while filters are on", asyn
   await page.keyboard.press("Enter");
   await answered;
 
-  expect(await serverBoard(seed.projectId, seed.owner)).toMatchObject({
+  expect(await serverBoard(seed.listId, seed.owner)).toMatchObject({
     "To do": ["Bravo", "Charlie"],
     "In progress": ["Delta", "Alpha"],
   });
@@ -268,7 +268,7 @@ test("keyboard only: filter, open a task and move it while filters are on", asyn
 test("filters with no results show an empty state, and Clear brings everything back", async ({
   page,
 }) => {
-  await page.goto(`/projects/${seed.projectId}?q=zzz&priority=BOGUS`);
+  await page.goto(`/lists/${seed.listId}?q=zzz&priority=BOGUS`);
   await expect(page.getByText("No tasks match these filters.")).toBeVisible();
   await page.getByRole("link", { name: "Clear" }).click();
   await expect(card(page, "Alpha")).toBeVisible();
@@ -296,7 +296,7 @@ test("the landing page explains Kanban, and its button depends on the session", 
     page.getByRole("heading", { name: "What is Kanban?" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Go to your projects" }).first(),
+    page.getByRole("link", { name: "Go to your workspaces" }).first(),
   ).toBeVisible();
 
   await context.clearCookies();
@@ -344,7 +344,7 @@ test("email sign-up asks the user to confirm, and an unconfirmed account cannot 
   await expect(page.locator('p[role="status"]')).toContainText(
     "Check your inbox",
   );
-  await page.goto("/projects");
+  await page.goto("/workspaces");
   await expect(page).toHaveURL(/\/login/);
 
   // A wrong password is an error, not a prompt to confirm.
@@ -366,6 +366,6 @@ test("a confirmed user signs in with email and password", async ({
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("a long enough password");
   await page.getByRole("button", { name: "Sign in with email" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/workspaces$/);
   await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
 });

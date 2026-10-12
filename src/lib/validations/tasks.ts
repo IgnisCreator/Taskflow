@@ -18,7 +18,7 @@ const dueDate = z
   .nullable();
 const expectedBoardVersion = z.number().int().min(0);
 
-// Unknown keys are rejected: createdById, projectId, position... never come from the client.
+// Unknown keys are rejected: createdById, listId, position... never come from the client.
 export const createTaskSchema = z.strictObject({
   /** Chosen by the client so that retrying a lost response cannot create a duplicate. */
   id: z.uuid(),

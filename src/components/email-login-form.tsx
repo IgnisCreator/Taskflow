@@ -19,7 +19,7 @@ export function EmailLoginForm() {
     const password = String(form.get("password"));
     setError(null);
     setPending(true);
-    const callbackURL = "/projects";
+    const callbackURL = "/workspaces";
     const { error } =
       mode === "signup"
         ? await authClient.signUp.email({

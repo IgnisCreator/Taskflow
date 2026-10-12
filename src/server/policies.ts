@@ -1,43 +1,57 @@
-import type { ProjectRole } from "@/generated/prisma/enums";
+import type { WorkspaceRole } from "@/generated/prisma/enums";
 
-export type ProjectAction =
-  | "project:view"
-  | "project:edit"
-  | "project:delete"
+export type WorkspaceAction =
+  | "workspace:edit" // name and role labels
+  | "workspace:delete"
   | "member:manage"
+  | "structure:manage" // spaces, folders, lists and who sees a private space
   | "task:write";
 
-/** Who is asking, relative to one project. The owner always holds an ADMIN membership. */
-export type Actor = { role: ProjectRole; isOwner: boolean };
+/** Who is asking, relative to one workspace. */
+export type Actor = { role: WorkspaceRole };
 
-// Source of truth for permissions (matrix in the consolidated plan, section 5).
-// `task:write` covers create, edit, assign and delete (and, in TF-06, move).
-export function can(actor: Actor, action: ProjectAction): boolean {
+const isAdmin = (role: WorkspaceRole) => role === "OWNER" || role === "ADMIN";
+
+// Source of truth for permissions. `task:write` covers create, edit, assign, move and delete.
+export function can(actor: Actor, action: WorkspaceAction): boolean {
   switch (action) {
-    case "project:view":
-      return true;
-    case "project:edit":
+    case "workspace:edit":
     case "member:manage":
-      return actor.role === "ADMIN";
+    case "structure:manage":
+      return isAdmin(actor.role);
+    case "workspace:delete":
+      return actor.role === "OWNER";
     case "task:write":
-      return actor.role !== "VIEWER";
-    case "project:delete":
-      return actor.isOwner;
+      return actor.role !== "GUEST";
   }
+}
+
+/**
+ * Who sees a space (and everything in it). OWNER and ADMIN see every space; a MEMBER sees public
+ * spaces and the private ones they are listed in; a GUEST only the spaces they are listed in.
+ */
+export function canSeeSpace(
+  role: WorkspaceRole,
+  space: { isPrivate: boolean },
+  listed: boolean,
+): boolean {
+  if (isAdmin(role)) return true;
+  if (role === "GUEST") return listed;
+  return !space.isPrivate || listed;
 }
 
 /**
  * Adding, changing or removing a member.
  * - `from`: the target's current role (absent when adding); `to`: the new role (absent when removing).
- * - Owner and ADMIN manage MEMBER and VIEWER; only the owner may touch an ADMIN (grant, change,
- *   remove, including an ADMIN acting on themselves). Nobody can touch the owner.
+ * - OWNER and ADMIN manage MEMBER and GUEST; only the OWNER may touch an ADMIN (grant, change,
+ *   remove, including an ADMIN acting on themselves). Nobody touches the OWNER, and OWNER is never granted.
  */
 export function canManageMember(
   actor: Actor,
-  change: { from?: ProjectRole; to?: ProjectRole; targetIsOwner: boolean },
+  change: { from?: WorkspaceRole; to?: WorkspaceRole },
 ): boolean {
-  if (change.targetIsOwner) return false;
-  if (actor.role !== "ADMIN") return false;
+  if (change.from === "OWNER" || change.to === "OWNER") return false;
+  if (!can(actor, "member:manage")) return false;
   const touchesAdmin = change.from === "ADMIN" || change.to === "ADMIN";
-  return touchesAdmin ? actor.isOwner : true;
+  return touchesAdmin ? actor.role === "OWNER" : true;
 }

@@ -10,7 +10,7 @@ export function LoginButton() {
       onClick={() =>
         authClient.signIn.social({
           provider: "github",
-          callbackURL: "/projects",
+          callbackURL: "/workspaces",
         })
       }
     >

@@ -42,14 +42,14 @@ type Notice = { kind: "info" | "error"; text: string };
  * on focus, and reloads when someone else changed it.
  */
 export function Board({
-  projectId,
+  listId,
   boardVersion,
   canWrite,
   columns,
   members,
   filtered,
 }: {
-  projectId: string;
+  listId: string;
   boardVersion: number;
   canWrite: boolean;
   columns: ColumnView[];
@@ -82,7 +82,7 @@ export function Board({
     async function check() {
       if (document.visibilityState !== "visible" || busyRef.current) return;
       try {
-        const res = await fetch(`/api/projects/${projectId}/version`, {
+        const res = await fetch(`/api/lists/${listId}/version`, {
           cache: "no-store",
         });
         if (!res.ok) return;
@@ -109,7 +109,7 @@ export function Board({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", check);
     };
-  }, [projectId, router]);
+  }, [listId, router]);
 
   useEffect(() => {
     if (notice?.kind !== "info") return;
@@ -137,7 +137,7 @@ export function Board({
 
     const result = await api(
       "PATCH",
-      `/api/projects/${projectId}/tasks/${taskId}/move`,
+      `/api/lists/${listId}/tasks/${taskId}/move`,
       { columnId, toIndex, expectedBoardVersion: boardVersion },
     );
     if (!result.ok) {
@@ -245,7 +245,7 @@ export function Board({
         </DragOverlay>
       </DndContext>
       <TaskDialog
-        projectId={projectId}
+        listId={listId}
         columns={shown}
         members={members}
         canWrite={canWrite}

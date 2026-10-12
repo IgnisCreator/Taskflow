@@ -1,14 +1,17 @@
 import "server-only";
-import type { ProjectRole } from "@/generated/prisma/enums";
-import { MAX_MEMBERS } from "@/lib/validations/members";
+import type { WorkspaceRole } from "@/generated/prisma/enums";
+import { MAX_MEMBERS } from "@/lib/validations/workspaces";
 import { db } from "@/server/db";
 import { ApiError } from "@/server/http";
-import { canManageMember } from "@/server/policies";
 import {
   forbidden,
-  projectNotFound,
-  withProjectLock,
-} from "@/server/project-lock";
+  notFound,
+  withWorkspaceLock,
+  type Tx,
+} from "@/server/locks";
+import { canManageMember } from "@/server/policies";
+
+type GrantableRole = Exclude<WorkspaceRole, "OWNER">;
 
 const memberSelect = {
   userId: true,
@@ -16,56 +19,51 @@ const memberSelect = {
   user: { select: { name: true, image: true } },
 } as const;
 
-type MemberRow = {
-  userId: string;
-  role: ProjectRole;
-  user: { name: string; image: string | null };
-};
-
 // Never includes email, publicId or tokens.
-const toView = (row: MemberRow, ownerId: string) => ({
-  userId: row.userId,
-  name: row.user.name,
-  image: row.user.image,
-  role: row.role,
-  isOwner: row.userId === ownerId,
-});
+const toView = ({
+  user,
+  ...member
+}: {
+  userId: string;
+  role: WorkspaceRole;
+  user: { name: string; image: string | null };
+}) => ({ ...member, name: user.name, image: user.image });
 
-export async function listMembers(userId: string, projectId: string) {
-  const project = await db.project.findFirst({
-    where: { id: projectId, members: { some: { userId } } },
+export async function listMembers(userId: string, workspaceId: string) {
+  const workspace = await db.workspace.findFirst({
+    where: { id: workspaceId, members: { some: { userId } } },
     select: {
-      ownerId: true,
       members: { select: memberSelect, orderBy: { user: { name: "asc" } } },
     },
   });
-  if (!project) throw projectNotFound();
-  return project.members.map((row) => toView(row, project.ownerId));
+  if (!workspace) throw notFound("Workspace");
+  return workspace.members.map(toView);
 }
 
+/**
+ * Adds an existing user, found by exact email (there is no public sign-up and no user directory).
+ * An unknown email is reported as such; the email itself is never echoed back.
+ */
 export async function addMember(
   userId: string,
-  projectId: string,
-  input: { publicId: string; role: ProjectRole; expectedBoardVersion: number },
+  workspaceId: string,
+  input: { email: string; role: GrantableRole },
 ) {
-  const { result, boardVersion } = await withProjectLock(
+  return withWorkspaceLock(
     userId,
-    projectId,
-    input.expectedBoardVersion,
+    workspaceId,
     "member:manage", // coarse gate; canManageMember below decides per role
     async (tx, actor) => {
-      if (!canManageMember(actor, { to: input.role, targetIsOwner: false })) {
-        throw forbidden();
-      }
-      const target = await tx.user.findUnique({
-        where: { publicId: input.publicId },
+      if (!canManageMember(actor, { to: input.role })) throw forbidden();
+      const target = await tx.user.findFirst({
+        where: { email: { equals: input.email, mode: "insensitive" } },
         select: { id: true },
       });
       if (!target) {
-        throw new ApiError(404, "USER_NOT_FOUND", "No user has that public ID");
+        throw new ApiError(404, "USER_NOT_FOUND", "No user has that email");
       }
-      const members = await tx.projectMember.findMany({
-        where: { projectId },
+      const members = await tx.workspaceMember.findMany({
+        where: { workspaceId },
         select: { userId: true },
       });
       if (members.some((m) => m.userId === target.id)) {
@@ -75,107 +73,76 @@ export async function addMember(
         throw new ApiError(
           409,
           "LIMIT_REACHED",
-          `A project has at most ${MAX_MEMBERS} members`,
+          `A workspace has at most ${MAX_MEMBERS} members`,
         );
       }
-      return tx.projectMember.create({
-        data: { projectId, userId: target.id, role: input.role },
-        select: memberSelect,
-      });
+      return toView(
+        await tx.workspaceMember.create({
+          data: { workspaceId, userId: target.id, role: input.role },
+          select: memberSelect,
+        }),
+      );
     },
   );
-  const owner = await db.project.findUniqueOrThrow({
-    where: { id: projectId },
-    select: { ownerId: true },
-  });
-  return { ...toView(result, owner.ownerId), boardVersion };
 }
 
 export async function changeMemberRole(
   userId: string,
-  projectId: string,
+  workspaceId: string,
   targetId: string,
-  input: { role: ProjectRole; expectedBoardVersion: number },
+  role: GrantableRole,
 ) {
-  const { result, boardVersion } = await withProjectLock(
+  return withWorkspaceLock(
     userId,
-    projectId,
-    input.expectedBoardVersion,
+    workspaceId,
     "member:manage",
     async (tx, actor) => {
-      const { target, ownerId } = await findTarget(tx, projectId, targetId);
-      if (
-        !canManageMember(actor, {
-          from: target.role,
-          to: input.role,
-          targetIsOwner: targetId === ownerId,
-        })
-      ) {
-        throw forbidden();
-      }
-      return tx.projectMember.update({
-        where: { projectId_userId: { projectId, userId: targetId } },
-        data: { role: input.role },
-        select: memberSelect,
-      });
+      const from = await findRole(tx, workspaceId, targetId);
+      if (!canManageMember(actor, { from, to: role })) throw forbidden();
+      return toView(
+        await tx.workspaceMember.update({
+          where: { workspaceId_userId: { workspaceId, userId: targetId } },
+          data: { role },
+          select: memberSelect,
+        }),
+      );
     },
   );
-  const owner = await db.project.findUniqueOrThrow({
-    where: { id: projectId },
-    select: { ownerId: true },
-  });
-  return { ...toView(result, owner.ownerId), boardVersion };
 }
 
-/** Un-assigns the member's tasks and removes the membership in the same transaction. */
+/**
+ * Removes the member: un-assigns their tasks in this workspace and, through the foreign key, drops
+ * their space memberships, all in one transaction.
+ */
 export async function removeMember(
   userId: string,
-  projectId: string,
+  workspaceId: string,
   targetId: string,
-  expectedBoardVersion: number,
 ) {
-  await withProjectLock(
+  await withWorkspaceLock(
     userId,
-    projectId,
-    expectedBoardVersion,
+    workspaceId,
     "member:manage",
     async (tx, actor) => {
-      const { target, ownerId } = await findTarget(tx, projectId, targetId);
-      if (
-        !canManageMember(actor, {
-          from: target.role,
-          targetIsOwner: targetId === ownerId,
-        })
-      ) {
-        throw forbidden();
-      }
+      const from = await findRole(tx, workspaceId, targetId);
+      if (!canManageMember(actor, { from })) throw forbidden();
       await tx.task.updateMany({
-        where: { projectId, assigneeId: targetId },
+        where: { assigneeId: targetId, list: { space: { workspaceId } } },
         data: { assigneeId: null },
       });
-      await tx.projectMember.delete({
-        where: { projectId_userId: { projectId, userId: targetId } },
+      await tx.workspaceMember.delete({
+        where: { workspaceId_userId: { workspaceId, userId: targetId } },
       });
     },
   );
 }
 
-async function findTarget(
-  tx: Parameters<Parameters<typeof withProjectLock>[4]>[0],
-  projectId: string,
-  targetId: string,
-) {
-  const [target, project] = await Promise.all([
-    tx.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId: targetId } },
-      select: { role: true },
-    }),
-    tx.project.findUniqueOrThrow({
-      where: { id: projectId },
-      select: { ownerId: true },
-    }),
-  ]);
-  // A user who is not in this project (even if they exist elsewhere) is simply not found.
-  if (!target) throw new ApiError(404, "NOT_FOUND", "Member not found");
-  return { target, ownerId: project.ownerId };
+async function findRole(tx: Tx, workspaceId: string, targetId: string) {
+  const target = await tx.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId: targetId } },
+    select: { role: true },
+  });
+  // A user who is not in this workspace (even if they exist elsewhere) is simply not found.
+  if (!target) throw notFound("Member");
+  return target.role;
 }

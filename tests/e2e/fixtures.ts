@@ -21,6 +21,7 @@ const auth = betterAuth({
 
 export type TestUser = {
   id: string;
+  email: string;
   /** For the browser (`context.addCookies`). */
   cookies: Awaited<ReturnType<typeof browserCookies>>;
   /** For direct HTTP calls from the test, acting as this user. */
@@ -42,6 +43,7 @@ export async function createUser(label: string): Promise<TestUser> {
   const headers = await ctx.test.getAuthHeaders({ userId: user.id });
   return {
     id: user.id,
+    email: user.email,
     cookies: await browserCookies(user.id),
     cookie: headers.get("cookie") ?? "",
   };
@@ -49,27 +51,37 @@ export async function createUser(label: string): Promise<TestUser> {
 
 export const COLUMNS = ["To do", "In progress", "In review", "Done"];
 
-/** An owner, a member, and a project with Alpha, Bravo, Charlie in "To do" and Delta in "In progress". */
+/**
+ * An owner and a member in a workspace with a public space holding a list with Alpha, Bravo, Charlie
+ * in "To do" and Delta in "In progress".
+ */
 export async function seedBoard() {
   const owner = await createUser("owner");
   const member = await createUser("member");
-  const project = await prisma.project.create({
+  const workspace = await prisma.workspace.create({
     data: {
-      name: "E2E project",
-      ownerId: owner.id,
+      name: "E2E workspace",
       members: {
         create: [
-          { userId: owner.id, role: "ADMIN" },
+          { userId: owner.id, role: "OWNER" },
           { userId: member.id, role: "MEMBER" },
         ],
       },
+      spaces: { create: { name: "General" } },
+    },
+    include: { spaces: true },
+  });
+  const list = await prisma.list.create({
+    data: {
+      name: "E2E list",
+      spaceId: workspace.spaces[0]!.id,
       columns: {
         create: COLUMNS.map((name, position) => ({ name, position })),
       },
     },
     include: { columns: { orderBy: { position: "asc" } } },
   });
-  const [todo, doing] = project.columns;
+  const [todo, doing] = list.columns;
   const rows: [string, string, number][] = [
     ["Alpha", todo!.id, 0],
     ["Bravo", todo!.id, 1],
@@ -78,19 +90,23 @@ export async function seedBoard() {
   ];
   await prisma.task.createMany({
     data: rows.map(([title, columnId, position]) => ({
-      projectId: project.id,
+      listId: list.id,
       columnId,
       title,
       position,
       createdById: owner.id,
     })),
   });
-  return { projectId: project.id, owner, member };
+  return { listId: list.id, workspaceId: workspace.id, owner, member };
 }
 
 export async function cleanup() {
-  await prisma.project.deleteMany({
-    where: { owner: { email: { endsWith: "@example.test" } } },
+  await prisma.workspace.deleteMany({
+    where: {
+      members: {
+        some: { role: "OWNER", user: { email: { endsWith: "@example.test" } } },
+      },
+    },
   });
   await prisma.user.deleteMany({
     where: { email: { endsWith: "@example.test" } },
@@ -98,8 +114,8 @@ export async function cleanup() {
 }
 
 /** What the server says the board looks like: column name -> task titles in order. */
-export async function serverBoard(projectId: string, user: TestUser) {
-  const res = await fetch(`${E2E_ORIGIN}/api/projects/${projectId}/board`, {
+export async function serverBoard(listId: string, user: TestUser) {
+  const res = await fetch(`${E2E_ORIGIN}/api/lists/${listId}/board`, {
     headers: { cookie: user.cookie },
   });
   const board = (await res.json()) as {
@@ -113,20 +129,20 @@ export async function serverBoard(projectId: string, user: TestUser) {
 /** Another user moves a task through the API, which raises the board version behind the page's back. */
 export async function moveAs(
   user: TestUser,
-  projectId: string,
+  listId: string,
   title: string,
   columnName: string,
   toIndex: number,
 ) {
-  const [task, column, project] = await Promise.all([
-    prisma.task.findFirstOrThrow({ where: { projectId, title } }),
+  const [task, column, list] = await Promise.all([
+    prisma.task.findFirstOrThrow({ where: { listId, title } }),
     prisma.boardColumn.findFirstOrThrow({
-      where: { projectId, name: columnName },
+      where: { listId, name: columnName },
     }),
-    prisma.project.findUniqueOrThrow({ where: { id: projectId } }),
+    prisma.list.findUniqueOrThrow({ where: { id: listId } }),
   ]);
   const res = await fetch(
-    `${E2E_ORIGIN}/api/projects/${projectId}/tasks/${task.id}/move`,
+    `${E2E_ORIGIN}/api/lists/${listId}/tasks/${task.id}/move`,
     {
       method: "PATCH",
       headers: {
@@ -137,7 +153,7 @@ export async function moveAs(
       body: JSON.stringify({
         columnId: column.id,
         toIndex,
-        expectedBoardVersion: project.boardVersion,
+        expectedBoardVersion: list.boardVersion,
       }),
     },
   );
