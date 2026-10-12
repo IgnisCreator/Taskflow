@@ -60,11 +60,14 @@ export function FlowEditor({
   version,
   stages,
   templates,
+  saved,
 }: {
   listId: string;
   version: number;
   stages: ExistingStage[];
   templates: TemplateOption[];
+  /** The page was reloaded right after a successful save (the editor is rebuilt with the new version). */
+  saved: boolean;
 }) {
   const router = useRouter();
   const initial = stages.map((stage) => fromStage(stage, stage.id));
@@ -74,7 +77,8 @@ export function FlowEditor({
   const [target, setTarget] = useState<Record<string, string>>({});
   const [template, setTemplate] = useState(templates[0]?.ref ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // Edits after a save hide the "saved" notice.
+  const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(false);
 
   const removed = stages.filter((stage) => removedIds.includes(stage.id));
@@ -90,7 +94,7 @@ export function FlowEditor({
   };
 
   function update(key: string, patch: Partial<Row>) {
-    setSaved(false);
+    setDirty(true);
     setRows((current) =>
       current.map((row) => {
         if (row.key !== key) {
@@ -104,7 +108,7 @@ export function FlowEditor({
   }
 
   function move(index: number, by: -1 | 1) {
-    setSaved(false);
+    setDirty(true);
     setRows((current) => {
       const next = [...current];
       const other = index + by;
@@ -115,13 +119,13 @@ export function FlowEditor({
   }
 
   function remove(row: Row) {
-    setSaved(false);
+    setDirty(true);
     setRows((current) => current.filter((r) => r.key !== row.key));
     if (row.id) setRemovedIds((ids) => [...ids, row.id!]);
   }
 
   function add() {
-    setSaved(false);
+    setDirty(true);
     // New stages start as active work just before the first done stage.
     setRows((current) => {
       const at = current.findIndex((row) => row.category === "DONE");
@@ -141,14 +145,14 @@ export function FlowEditor({
   function loadTemplate() {
     const chosen = templates.find((t) => t.ref === template);
     if (!chosen) return;
-    setSaved(false);
+    setDirty(true);
     setRows(chosen.stages.map((stage) => fromStage(stage)));
     setRemovedIds(stages.map((stage) => stage.id)); // every current stage is replaced
     setTarget({});
   }
 
   function reset() {
-    setSaved(false);
+    setDirty(true);
     setRows(initial);
     setRemovedIds([]);
     setTarget({});
@@ -157,7 +161,6 @@ export function FlowEditor({
   async function save() {
     setPending(true);
     setError(null);
-    setSaved(false);
     const moveTo: Record<string, number> = {};
     for (const stage of removed) {
       if (stage.tasks > 0) {
@@ -177,8 +180,8 @@ export function FlowEditor({
       if (!result.network) router.refresh();
       return;
     }
-    setSaved(true);
-    router.refresh();
+    // The page reloads with the new version; the notice travels in the URL.
+    router.replace(`/lists/${listId}/flow?saved=1`);
   }
 
   return (
@@ -381,7 +384,7 @@ export function FlowEditor({
             {error}
           </p>
         )}
-        {saved && (
+        {saved && !dirty && (
           <p role="status" className="notice">
             Flow saved.
           </p>

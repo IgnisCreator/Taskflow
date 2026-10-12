@@ -10,8 +10,10 @@ import { listTemplates } from "@/server/services/templates";
 /** The workflow of one list; only OWNER and ADMIN reach it (anyone else gets 404). */
 export default async function FlowPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ listId: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }) {
   const user = await loadUser();
   const flow = await getFlow(user.id, (await params).listId);
@@ -52,6 +54,7 @@ export default async function FlowPage({
           version={list.boardVersion}
           stages={stages}
           templates={options}
+          saved={(await searchParams).saved === "1"}
         />
         <ApiForm
           method="POST"
