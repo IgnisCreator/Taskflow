@@ -31,6 +31,8 @@ const comments =
 const comment =
   await import("@/app/api/lists/[listId]/tasks/[taskId]/comments/[commentId]/route");
 const activity = await import("@/app/api/lists/[listId]/activity/route");
+const listMetrics = await import("@/app/api/lists/[listId]/metrics/route");
+const spaceMetrics = await import("@/app/api/spaces/[spaceId]/metrics/route");
 const catalog =
   await import("@/app/api/workspaces/[workspaceId]/catalog/route");
 const catalogKind =
@@ -461,6 +463,17 @@ const matrix: [string, Call, number[]][] = [
   [
     "GET activity",
     route(activity.GET, "GET", li("/activity")),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  // Metrics: anyone who can see the list (or the space) reads them.
+  [
+    "GET list metrics",
+    route(listMetrics.GET, "GET", li("/metrics")),
+    [200, 200, 200, 200, 404, 401],
+  ],
+  [
+    "GET space metrics",
+    route(spaceMetrics.GET, "GET", sp("/metrics")),
     [200, 200, 200, 200, 404, 401],
   ],
   // The workspace lists of task types and labels: members read, OWNER and ADMIN change.
