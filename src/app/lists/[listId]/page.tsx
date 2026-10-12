@@ -8,6 +8,7 @@ import { isFiltered, parseFilter } from "@/lib/validations/filters";
 import { ApiError } from "@/server/http";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
+import { listCatalog } from "@/server/services/catalog";
 import { getBoard } from "@/server/services/tasks";
 
 export default async function ListPage({
@@ -26,7 +27,10 @@ export default async function ListPage({
     },
   );
   const { list } = board;
-  const workspace = await loadWorkspace(user.id, list.workspaceId);
+  const [workspace, catalog] = await Promise.all([
+    loadWorkspace(user.id, list.workspaceId),
+    listCatalog(user.id, list.workspaceId),
+  ]);
 
   return (
     <WorkspaceShell workspace={workspace} currentListId={list.id}>
@@ -42,6 +46,9 @@ export default async function ListPage({
             <span className="badge normal-case">
               {roleLabel(workspace.roleLabels, list.role)}
             </span>
+            <Link href={`/lists/${list.id}/activity`} className="btn-secondary">
+              Activity
+            </Link>
             {can(list, "structure:manage") && (
               <>
                 <Link href={`/lists/${list.id}/flow`} className="btn-secondary">
@@ -64,6 +71,9 @@ export default async function ListPage({
           boardVersion={list.boardVersion}
           canWrite={can(list, "task:write")}
           members={board.members.map(({ userId, name }) => ({ userId, name }))}
+          catalog={catalog}
+          viewerId={user.id}
+          canModerate={can(list, "structure:manage")}
           columns={board.columns.map((column) => ({
             id: column.id,
             name: column.name,
@@ -76,8 +86,12 @@ export default async function ListPage({
               title: task.title,
               description: task.description,
               priority: task.priority,
-              assigneeId: task.assigneeId,
               dueDate: task.dueDate,
+              assigneeIds: task.assigneeIds,
+              type: task.type,
+              labels: task.labels,
+              blockedReason: task.blockedReason,
+              subtasks: task.subtasks,
             })),
           }))}
         />

@@ -69,6 +69,10 @@ export async function seedBoard() {
         ],
       },
       spaces: { create: { name: "General" } },
+      // The types every workspace starts with (the app creates them with the workspace).
+      types: {
+        create: ["Task", "Bug", "Feature", "Request"].map((name) => ({ name })),
+      },
     },
     include: { spaces: true },
   });

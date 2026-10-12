@@ -1,7 +1,8 @@
 import "server-only";
 import type { PutFlowInput } from "@/lib/validations/workflow";
-import { validateFlow } from "@/lib/workflow";
+import { moveEventType, validateFlow } from "@/lib/workflow";
 import { db } from "@/server/db";
+import { recordEvents } from "@/server/events";
 import { ApiError } from "@/server/http";
 import { withListLock } from "@/server/locks";
 import { can } from "@/server/policies";
@@ -42,7 +43,11 @@ export async function applyFlow(
     async (tx) => {
       const existing = await tx.boardColumn.findMany({
         where: { listId },
-        select: { id: true, _count: { select: { tasks: true } } },
+        select: {
+          id: true,
+          category: true,
+          _count: { select: { tasks: true } },
+        },
       });
       const known = new Set(existing.map((stage) => stage.id));
       const submitted = stages.flatMap((stage) => (stage.id ? [stage.id] : []));
@@ -107,6 +112,22 @@ export async function applyFlow(
             data: { columnId: target, position: first + offset },
           });
         }
+        // The tasks changed stage, so the history says so (before the old stage is deleted).
+        const to = {
+          id: target,
+          category: stages[moveTo[stage.id]!]!.category,
+        };
+        await recordEvents(
+          tx,
+          tasks.map((task) => ({
+            taskId: task.id,
+            listId,
+            type: moveEventType(stage.category, to.category),
+            from: { id: stage.id, category: stage.category },
+            to,
+            actorId: userId,
+          })),
+        );
       }
       await tx.boardColumn.deleteMany({
         where: { id: { in: removed.map((stage) => stage.id) } },

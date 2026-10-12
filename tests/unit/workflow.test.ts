@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SYSTEM_TEMPLATES,
   defaultTarget,
+  moveEventType,
   systemTemplate,
   validateFlow,
   type Category,
@@ -137,5 +138,23 @@ describe("defaultTarget", () => {
       ...next.slice(2),
     ];
     expect(defaultTarget({ category: "WAITING" }, withWaiting)).toBe(2);
+  });
+});
+
+describe("moveEventType", () => {
+  it.each([
+    ["BACKLOG", "ACTIVE", "MOVED"],
+    ["ACTIVE", "WAITING", "MOVED"],
+    ["ACTIVE", "DONE", "MOVED"],
+    ["ACTIVE", "DISCARDED", "DISCARDED"],
+    ["BACKLOG", "DISCARDED", "DISCARDED"],
+    ["DONE", "DISCARDED", "DISCARDED"],
+    ["DONE", "ACTIVE", "REOPENED"],
+    ["DONE", "BACKLOG", "REOPENED"],
+    ["DISCARDED", "BACKLOG", "REOPENED"],
+    ["DISCARDED", "DONE", "MOVED"],
+    ["ACTIVE", "BACKLOG", "MOVED"],
+  ] as const)("%s to %s is %s", (from, to, expected) => {
+    expect(moveEventType(from, to)).toBe(expected);
   });
 });

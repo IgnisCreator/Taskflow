@@ -26,7 +26,8 @@ model User {
   accounts      Account[]
   memberships   WorkspaceMember[]
   createdTasks  Task[]
-  assignedTasks Task[]            @relation("assignee")
+  assignments   TaskAssignee[]
+  comments      Comment[]
 
   @@unique([email])
   @@map("user")
@@ -115,6 +116,32 @@ model Workspace {
   members    WorkspaceMember[]
   spaces     Space[]
   templates  WorkflowTemplate[]
+  types      WorkItemType[]
+  labels     Label[]
+}
+
+/// What kind of work a task is (Task, Bug, Request...). Chosen by the workspace; metrics can be split by it.
+model WorkItemType {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@unique([workspaceId, name])
+}
+
+/// A free tag of the workspace, attached to any number of tasks.
+model Label {
+  id          String      @id @default(uuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime    @default(now())
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       TaskLabel[]
+
+  @@unique([workspaceId, name])
 }
 
 /// A flow saved by the organisation from one of its lists. The system templates live in the code.
@@ -202,6 +229,7 @@ model List {
   folder       Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
   columns      BoardColumn[]
   tasks        Task[]
+  events       TaskEvent[]
 
   @@index([spaceId])
   @@index([folderId])
@@ -222,34 +250,119 @@ model BoardColumn {
   policy            String?
   list              List          @relation(fields: [listId], references: [id], onDelete: Cascade)
   tasks             Task[]
+  eventsFrom        TaskEvent[]   @relation("eventFrom")
+  eventsTo          TaskEvent[]   @relation("eventTo")
 
   @@unique([listId, id])
   @@unique([listId, position])
 }
 
 model Task {
-  id          String      @id @default(uuid())
-  listId      String
-  columnId    String
-  title       String
-  description String?
-  priority    Priority    @default(MEDIUM)
-  /// Must be a member of the list's workspace when set (checked by the service).
-  assigneeId  String?
+  id            String         @id @default(uuid())
+  listId        String
+  columnId      String
+  title         String
+  description   String?
+  priority      Priority       @default(MEDIUM)
+  typeId        String?
+  /// Why the task is blocked; null when it is not. Time spent blocked is measured from the events.
+  blockedReason String?
   /// Calendar date (YYYY-MM-DD), no time zone.
-  dueDate     DateTime?   @db.Date
-  position    Int
-  createdById String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  list        List        @relation(fields: [listId], references: [id], onDelete: Cascade)
+  dueDate       DateTime?      @db.Date
+  position      Int
+  createdById   String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  list          List           @relation(fields: [listId], references: [id], onDelete: Cascade)
   // Composite foreign key keeps a task and its column inside one list.
   // NoAction (verified in verificacion/06_experimento_fk.md): never SetNull, it would null listId.
-  column      BoardColumn @relation(fields: [listId, columnId], references: [listId, id], onDelete: NoAction)
-  assignee    User?       @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  createdBy   User        @relation(fields: [createdById], references: [id])
+  column        BoardColumn    @relation(fields: [listId, columnId], references: [listId, id], onDelete: NoAction)
+  type          WorkItemType?  @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  /// Everyone who works on it; each must be able to see the list (checked by the service).
+  assignees     TaskAssignee[]
+  labels        TaskLabel[]
+  subtasks      Subtask[]
+  comments      Comment[]
+  events        TaskEvent[]
 
   @@index([listId, columnId, position])
-  @@index([listId, assigneeId])
+  @@index([typeId])
   @@index([listId, priority])
+}
+
+model TaskAssignee {
+  taskId String
+  userId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model TaskLabel {
+  taskId  String
+  labelId String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@index([labelId])
+}
+
+/// A checklist item. It is not a task: it never counts in throughput or cycle time.
+model Subtask {
+  id       String  @id @default(uuid())
+  taskId   String
+  title    String
+  done     Boolean @default(false)
+  position Int
+  task     Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, position])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+enum TaskEventType {
+  CREATED
+  MOVED
+  BLOCKED
+  UNBLOCKED
+  DISCARDED
+  REOPENED
+}
+
+/// Append-only history of what happens to a task: the base of every flow metric. The category of
+/// the stage is copied into the event, so later changes to a flow never rewrite the past.
+/// Rows are only ever inserted (and removed with their task or list).
+model TaskEvent {
+  id           String         @id @default(uuid())
+  taskId       String
+  listId       String
+  type         TaskEventType
+  fromStageId  String?
+  toStageId    String?
+  fromCategory StageCategory?
+  toCategory   StageCategory?
+  actorId      String
+  at           DateTime       @default(now())
+  task         Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  list         List           @relation(fields: [listId], references: [id], onDelete: Cascade)
+  fromStage    BoardColumn?   @relation("eventFrom", fields: [fromStageId], references: [id], onDelete: SetNull)
+  toStage      BoardColumn?   @relation("eventTo", fields: [toStageId], references: [id], onDelete: SetNull)
+
+  @@index([listId, at])
+  @@index([taskId, at])
 }

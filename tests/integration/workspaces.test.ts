@@ -476,7 +476,7 @@ describe("members", () => {
     );
     expect(res.status).toBe(204);
     const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(task.assigneeId).toBeNull();
+    expect(await db.taskAssignee.count({ where: { taskId } })).toBe(0);
     expect(task.createdById).toBe(world.owner.id);
     expect(
       await db.spaceMember.count({

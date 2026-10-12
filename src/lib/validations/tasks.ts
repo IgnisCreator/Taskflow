@@ -11,7 +11,16 @@ const description = z
   .max(5000)
   .transform((value) => value || null);
 const priority = z.enum(["LOW", "MEDIUM", "HIGH"]);
-const assigneeId = z.string().min(1).max(100).nullable();
+export const MAX_ASSIGNEES = 10;
+export const MAX_LABELS = 10;
+const id = z.string().min(1).max(100);
+/** Distinct ids (a repeated one is a client bug, not something to fix silently). */
+const idList = (max: number) =>
+  z
+    .array(id)
+    .max(max)
+    .refine((ids) => new Set(ids).size === ids.length, "Ids must be distinct");
+const blockedReason = z.string().trim().min(1).max(300).nullable();
 const dueDate = z
   .string()
   .refine(isCalendarDate, "Use a real date as YYYY-MM-DD")
@@ -26,7 +35,9 @@ export const createTaskSchema = z.strictObject({
   title,
   description: description.optional().transform((value) => value ?? null),
   priority: priority.default("MEDIUM"),
-  assigneeId: assigneeId.default(null),
+  assigneeIds: idList(MAX_ASSIGNEES).default([]),
+  typeId: id.nullable().default(null),
+  labelIds: idList(MAX_LABELS).default([]),
   dueDate: dueDate.default(null),
   expectedBoardVersion,
 });
@@ -37,8 +48,12 @@ export const updateTaskSchema = z
     title: title.optional(),
     description: description.optional(),
     priority: priority.optional(),
-    assigneeId: assigneeId.optional(),
+    assigneeIds: idList(MAX_ASSIGNEES).optional(),
+    typeId: id.nullable().optional(),
+    labelIds: idList(MAX_LABELS).optional(),
     dueDate: dueDate.optional(),
+    /** A reason blocks the task; null unblocks it. The time spent blocked is measured from the events. */
+    blockedReason: blockedReason.optional(),
     expectedBoardVersion,
   })
   .refine(

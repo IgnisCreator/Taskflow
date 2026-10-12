@@ -73,9 +73,24 @@ export async function createListFor(
       columnId: list.columns[0]!.id,
       title: "Assigned to member",
       position: 0,
-      assigneeId: world.member.id,
+      assignees: { create: { userId: world.member.id } },
       createdById: world.owner.id,
     },
+  });
+  // Something of each kind to act on: a checklist item and a comment (written by the member), a
+  // label, and one of the task types every workspace starts with.
+  const subtask = await db.subtask.create({
+    data: { taskId: task.id, title: "Step", position: 0 },
+  });
+  const comment = await db.comment.create({
+    data: { taskId: task.id, authorId: world.member.id, body: "Hello" },
+  });
+  const label = await db.label.create({
+    data: { workspaceId, name: "urgent" },
+  });
+  const type = await db.workItemType.findFirstOrThrow({
+    where: { workspaceId },
+    orderBy: { name: "asc" },
   });
   return {
     workspaceId,
@@ -83,8 +98,21 @@ export async function createListFor(
     folderId: folder.id,
     listId: list.id,
     taskId: task.id,
+    subtaskId: subtask.id,
+    commentId: comment.id,
+    labelId: label.id,
+    typeId: type.id,
   };
 }
+
+/** Everything that hangs from a task, so a rejected request that touched any of it shows. */
+const taskParts = {
+  assignees: { orderBy: { userId: "asc" } },
+  labels: { orderBy: { labelId: "asc" } },
+  subtasks: { orderBy: { id: "asc" } },
+  comments: { orderBy: { id: "asc" } },
+  events: { orderBy: { id: "asc" } },
+} as const;
 
 /** Everything a rejected request must leave untouched, from the workspace down to the tasks. */
 export async function snapshot(workspaceId: string) {
@@ -93,6 +121,8 @@ export async function snapshot(workspaceId: string) {
     include: {
       members: { orderBy: { userId: "asc" } },
       templates: { orderBy: { id: "asc" } },
+      types: { orderBy: { id: "asc" } },
+      labels: { orderBy: { id: "asc" } },
       spaces: {
         orderBy: { id: "asc" },
         include: {
@@ -102,7 +132,7 @@ export async function snapshot(workspaceId: string) {
             orderBy: { id: "asc" },
             include: {
               columns: { orderBy: { position: "asc" } },
-              tasks: { orderBy: { id: "asc" } },
+              tasks: { orderBy: { id: "asc" }, include: taskParts },
             },
           },
         },
@@ -120,7 +150,8 @@ export async function snapshotList(listId: string) {
     where: { id: listId },
     include: {
       columns: { orderBy: { position: "asc" } },
-      tasks: { orderBy: { id: "asc" } },
+      tasks: { orderBy: { id: "asc" }, include: taskParts },
+      events: { orderBy: { id: "asc" } },
     },
   });
   return JSON.stringify(row);

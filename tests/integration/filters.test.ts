@@ -17,32 +17,32 @@ beforeAll(async () => {
     orderBy: { position: "asc" },
   });
   const base = { listId, createdById: world.owner.id };
-  await db.task.createMany({
-    data: [
-      {
-        ...base,
-        columnId: first!.id,
-        position: 1,
-        title: "Fix Login bug",
-        priority: "HIGH",
-      },
-      {
-        ...base,
-        columnId: first!.id,
-        position: 2,
-        title: "Write docs",
-        description: "explain the LOGIN flow",
-        assigneeId: world.owner.id,
-      },
-      {
-        ...base,
-        columnId: second!.id,
-        position: 0,
-        title: "100% done_",
-        priority: "LOW",
-      },
-    ],
-  });
+  for (const data of [
+    {
+      ...base,
+      columnId: first!.id,
+      position: 1,
+      title: "Fix Login bug",
+      priority: "HIGH" as const,
+    },
+    {
+      ...base,
+      columnId: first!.id,
+      position: 2,
+      title: "Write docs",
+      description: "explain the LOGIN flow",
+      assignees: { create: { userId: world.owner.id } },
+    },
+    {
+      ...base,
+      columnId: second!.id,
+      position: 0,
+      title: "100% done_",
+      priority: "LOW" as const,
+    },
+  ]) {
+    await db.task.create({ data });
+  }
 });
 afterAll(cleanupTestData);
 
@@ -90,7 +90,7 @@ describe("board filters (applied in SQL)", () => {
 
   it("each column reports its total regardless of the filter", async () => {
     const { columns } = await getBoard(world.owner.id, listId, {
-      priority: "LOW",
+      priority: "LOW" as const,
     });
     expect(columns.map((c) => [c.tasks.length, c.total]).slice(0, 2)).toEqual([
       [0, 3],
@@ -105,7 +105,7 @@ describe("parseFilter", () => {
       parseFilter({ q: " hi ", priority: "HIGH", assignee: "u1" }),
     ).toEqual({
       q: "hi",
-      priority: "HIGH",
+      priority: "HIGH" as const,
       assignee: "u1",
     });
     expect(
