@@ -32,15 +32,15 @@ export default async function RootLayout({
         <header className="sticky top-0 z-10 border-b border-line bg-surface">
           <nav
             aria-label="Main"
-            className="mx-auto flex max-w-4xl items-center gap-6 px-4 py-3 text-sm"
+            className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 text-sm sm:gap-6"
           >
             <Link href="/" className="text-base font-semibold text-link">
               TaskFlow
             </Link>
             {user ? (
               <>
-                <Link href="/projects" className="text-muted hover:text-fg">
-                  Projects
+                <Link href="/workspaces" className="text-muted hover:text-fg">
+                  Workspaces
                 </Link>
                 <Link href="/profile" className="text-muted hover:text-fg">
                   Profile
@@ -54,7 +54,7 @@ export default async function RootLayout({
             <ThemeToggle initial={theme} />
           </nav>
         </header>
-        <div id="content" className="mx-auto max-w-4xl px-4 py-8">
+        <div id="content" className="mx-auto max-w-6xl px-4 py-8">
           {children}
         </div>
       </body>

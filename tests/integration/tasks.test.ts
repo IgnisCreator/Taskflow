@@ -1,22 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { callAs, cleanupTestData, type Actor } from "../helpers/actors";
 import {
-  createProjectFor,
+  createListFor,
   createWorld,
-  snapshot,
+  snapshotList,
   type World,
 } from "../helpers/world";
 
 const { db } = await import("@/server/db");
-const boardRoute = await import("@/app/api/projects/[projectId]/board/route");
-const tasksRoute = await import("@/app/api/projects/[projectId]/tasks/route");
-const taskRoute =
-  await import("@/app/api/projects/[projectId]/tasks/[taskId]/route");
+const boardRoute = await import("@/app/api/lists/[listId]/board/route");
+const tasksRoute = await import("@/app/api/lists/[listId]/tasks/route");
+const taskRoute = await import("@/app/api/lists/[listId]/tasks/[taskId]/route");
 
 const BASE = "http://localhost:3000";
 const HEADERS = { origin: BASE, "content-type": "application/json" };
-const href = (projectId: string, tail = "") =>
-  `${BASE}/api/projects/${projectId}${tail}`;
+const href = (listId: string, tail = "") =>
+  `${BASE}/api/lists/${listId}${tail}`;
 const req = (method: string, url: string, body?: object) =>
   new Request(url, {
     method,
@@ -31,21 +30,20 @@ beforeAll(async () => {
 });
 afterAll(cleanupTestData);
 
-const firstColumn = async (projectId: string, position = 0) =>
-  (await db.boardColumn.findFirstOrThrow({ where: { projectId, position } }))
-    .id;
+const firstColumn = async (listId: string, position = 0) =>
+  (await db.boardColumn.findFirstOrThrow({ where: { listId, position } })).id;
 
 const create = (
-  projectId: string,
+  listId: string,
   body: object,
   actor: Actor | null = world.owner,
 ) =>
-  callAs(actor, tasksRoute.POST, req("POST", href(projectId, "/tasks"), body), {
-    projectId,
+  callAs(actor, tasksRoute.POST, req("POST", href(listId, "/tasks"), body), {
+    listId,
   });
 
 const patch = (
-  projectId: string,
+  listId: string,
   taskId: string,
   body: object,
   actor: Actor | null = world.owner,
@@ -53,12 +51,12 @@ const patch = (
   callAs(
     actor,
     taskRoute.PATCH,
-    req("PATCH", href(projectId, `/tasks/${taskId}`), body),
-    { projectId, taskId },
+    req("PATCH", href(listId, `/tasks/${taskId}`), body),
+    { listId, taskId },
   );
 
 const remove = (
-  projectId: string,
+  listId: string,
   taskId: string,
   version: number,
   actor: Actor | null = world.owner,
@@ -66,10 +64,10 @@ const remove = (
   callAs(
     actor,
     taskRoute.DELETE,
-    req("DELETE", href(projectId, `/tasks/${taskId}`), {
+    req("DELETE", href(listId, `/tasks/${taskId}`), {
       expectedBoardVersion: version,
     }),
-    { projectId, taskId },
+    { listId, taskId },
   );
 
 const draft = (columnId: string, extra: object = {}) => ({
@@ -82,11 +80,11 @@ const draft = (columnId: string, extra: object = {}) => ({
 
 describe("creating a task", () => {
   it("adds it at the end of its column and records the author", async () => {
-    const { projectId } = await createProjectFor(world); // one task already in column 0
-    const columnId = await firstColumn(projectId);
+    const { listId } = await createListFor(world); // one task already in column 0
+    const columnId = await firstColumn(listId);
 
     const res = await create(
-      projectId,
+      listId,
       draft(columnId, { title: "  Second  ", priority: "HIGH" }),
     );
     expect(res.status).toBe(201);
@@ -104,7 +102,7 @@ describe("creating a task", () => {
     expect(boardVersion).toBe(1);
 
     const other = await create(
-      projectId,
+      listId,
       draft(columnId, { expectedBoardVersion: 1 }),
       world.member,
     );
@@ -112,35 +110,35 @@ describe("creating a task", () => {
   });
 
   it("defaults the priority to MEDIUM", async () => {
-    const { projectId } = await createProjectFor(world);
-    const res = await create(projectId, draft(await firstColumn(projectId, 1)));
+    const { listId } = await createListFor(world);
+    const res = await create(listId, draft(await firstColumn(listId, 1)));
     expect((await res.json()).task.priority).toBe("MEDIUM");
   });
 
   it("is safe to retry: the same id gives 200 and a single row, even with a stale version", async () => {
-    const { projectId } = await createProjectFor(world);
-    const body = draft(await firstColumn(projectId));
+    const { listId } = await createListFor(world);
+    const body = draft(await firstColumn(listId));
 
-    const first = await create(projectId, body);
+    const first = await create(listId, body);
     expect(first.status).toBe(201);
-    const replay = await create(projectId, body); // version 0 is now stale
+    const replay = await create(listId, body); // version 0 is now stale
     expect(replay.status).toBe(200);
     expect((await replay.json()).task.id).toBe(body.id);
 
     expect(await db.task.count({ where: { id: body.id } })).toBe(1);
-    const project = await db.project.findUniqueOrThrow({
-      where: { id: projectId },
+    const project = await db.list.findUniqueOrThrow({
+      where: { id: listId },
     });
     expect(project.boardVersion).toBe(1);
   });
 
   it("creates only one task when the same request is sent twice at once", async () => {
-    const { projectId } = await createProjectFor(world);
-    const body = draft(await firstColumn(projectId));
+    const { listId } = await createListFor(world);
+    const body = draft(await firstColumn(listId));
 
     const [a, b] = await Promise.all([
-      create(projectId, body),
-      create(projectId, body),
+      create(listId, body),
+      create(listId, body),
     ]);
 
     const statuses = [a.status, b.status].sort();
@@ -151,21 +149,21 @@ describe("creating a task", () => {
     expect(await db.task.count({ where: { id: body.id } })).toBe(1);
   });
 
-  it("does not reveal or take over a task id from another project", async () => {
-    const mine = await createProjectFor(world);
-    const other = await createProjectFor(world);
+  it("does not reveal or take over a task id from another list", async () => {
+    const mine = await createListFor(world);
+    const other = await createListFor(world);
     const foreign = await db.task.findFirstOrThrow({
-      where: { projectId: other.projectId },
+      where: { listId: other.listId },
     });
-    const before = await snapshot(mine.projectId);
+    const before = await snapshotList(mine.listId);
 
     const res = await create(
-      mine.projectId,
-      draft(await firstColumn(mine.projectId), { id: foreign.id }),
+      mine.listId,
+      draft(await firstColumn(mine.listId), { id: foreign.id }),
     );
 
     expect(res.status).toBe(404);
-    expect(await snapshot(mine.projectId)).toBe(before);
+    expect(await snapshotList(mine.listId)).toBe(before);
   });
 
   it.each([
@@ -182,55 +180,66 @@ describe("creating a task", () => {
     ["a date in the wrong format", { dueDate: "01/03/2026" }, 400],
     ["a client-chosen author", { createdById: "someone" }, 400],
     ["a client-chosen position", { position: 0 }, 400],
-    ["a client-chosen project", { projectId: "x" }, 400],
+    ["a client-chosen list", { listId: "x" }, 400],
     ["an id that is not a UUID", { id: "task-1" }, 400],
   ])("rejects %s", async (_label, extra, status) => {
-    const { projectId } = await createProjectFor(world);
-    const before = await snapshot(projectId);
-    const res = await create(
-      projectId,
-      draft(await firstColumn(projectId), extra),
-    );
+    const { listId } = await createListFor(world);
+    const before = await snapshotList(listId);
+    const res = await create(listId, draft(await firstColumn(listId), extra));
     expect(res.status).toBe(status);
     expect((await res.json()).error.code).toBe("VALIDATION_ERROR");
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 
-  it("rejects a column that belongs to another project", async () => {
-    const mine = await createProjectFor(world);
-    const other = await createProjectFor(world);
-    const before = await snapshot(mine.projectId);
+  it("rejects a column that belongs to another list", async () => {
+    const mine = await createListFor(world);
+    const other = await createListFor(world);
+    const before = await snapshotList(mine.listId);
 
     const res = await create(
-      mine.projectId,
-      draft(await firstColumn(other.projectId)),
+      mine.listId,
+      draft(await firstColumn(other.listId)),
     );
 
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe("INVALID_COLUMN");
-    expect(await snapshot(mine.projectId)).toBe(before);
+    expect(await snapshotList(mine.listId)).toBe(before);
   });
 
-  it("rejects an assignee who is not a member of the project", async () => {
-    const { projectId } = await createProjectFor(world);
-    const before = await snapshot(projectId);
+  it("rejects an assignee who is not a member of the list", async () => {
+    const { listId } = await createListFor(world);
+    const before = await snapshotList(listId);
 
     const res = await create(
-      projectId,
-      draft(await firstColumn(projectId), { assigneeId: world.stranger.id }),
+      listId,
+      draft(await firstColumn(listId), { assigneeId: world.stranger.id }),
     );
 
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe("INVALID_ASSIGNEE");
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
+  });
+
+  it("rejects a workspace member who cannot see the list's private space", async () => {
+    const { listId } = await createListFor(world, { privateSpace: true });
+    const before = await snapshotList(listId);
+
+    const res = await create(
+      listId,
+      draft(await firstColumn(listId), { assigneeId: world.member.id }),
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("INVALID_ASSIGNEE");
+    expect(await snapshotList(listId)).toBe(before);
   });
 
   it("stops at 200 tasks", async () => {
-    const { projectId } = await createProjectFor(world); // 1 task
-    const columnId = await firstColumn(projectId, 3);
+    const { listId } = await createListFor(world); // 1 task
+    const columnId = await firstColumn(listId, 3);
     await db.task.createMany({
       data: Array.from({ length: 199 }, (_, i) => ({
-        projectId,
+        listId,
         columnId,
         title: `Bulk ${i}`,
         position: i,
@@ -238,11 +247,11 @@ describe("creating a task", () => {
       })),
     });
 
-    const res = await create(projectId, draft(await firstColumn(projectId)));
+    const res = await create(listId, draft(await firstColumn(listId)));
 
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("LIMIT_REACHED");
-    expect(await db.task.count({ where: { projectId } })).toBe(200);
+    expect(await db.task.count({ where: { listId } })).toBe(200);
   });
 });
 
@@ -254,11 +263,11 @@ describe("due dates", () => {
       const original = process.env.TZ;
       process.env.TZ = zone;
       try {
-        const { projectId } = await createProjectFor(world);
-        const columnId = await firstColumn(projectId);
+        const { listId } = await createListFor(world);
+        const columnId = await firstColumn(listId);
 
         const res = await create(
-          projectId,
+          listId,
           draft(columnId, { dueDate: "2026-03-01" }),
         );
         const { task } = await res.json();
@@ -268,7 +277,7 @@ describe("due dates", () => {
           SELECT to_char("dueDate", 'YYYY-MM-DD') AS d FROM "Task" WHERE id = ${task.id}`;
         expect(saved[0]?.d).toBe("2026-03-01");
 
-        const edited = await patch(projectId, task.id, {
+        const edited = await patch(listId, task.id, {
           dueDate: "2026-12-31",
           expectedBoardVersion: 1,
         });
@@ -278,8 +287,8 @@ describe("due dates", () => {
           await callAs(
             world.owner,
             boardRoute.GET,
-            req("GET", href(projectId, "/board")),
-            { projectId },
+            req("GET", href(listId, "/board")),
+            { listId },
           )
         ).json();
         const onBoard = board.columns[0].tasks.find(
@@ -296,12 +305,12 @@ describe("due dates", () => {
 
 describe("editing a task", () => {
   it("changes only the given fields, can assign a member and clear the date", async () => {
-    const { projectId, taskId } = await createProjectFor(world);
+    const { listId, taskId } = await createListFor(world);
 
-    const res = await patch(projectId, taskId, {
+    const res = await patch(listId, taskId, {
       title: "Renamed",
       priority: "LOW",
-      assigneeId: world.viewer.id,
+      assigneeId: world.guest.id,
       dueDate: "2026-05-20",
       expectedBoardVersion: 0,
     });
@@ -310,13 +319,13 @@ describe("editing a task", () => {
     expect(task).toMatchObject({
       title: "Renamed",
       priority: "LOW",
-      assigneeId: world.viewer.id,
+      assigneeId: world.guest.id,
       dueDate: "2026-05-20",
       position: 0,
     });
     expect(boardVersion).toBe(1);
 
-    const cleared = await patch(projectId, taskId, {
+    const cleared = await patch(listId, taskId, {
       assigneeId: null,
       dueDate: null,
       description: "   ",
@@ -334,52 +343,52 @@ describe("editing a task", () => {
     ["nothing to change", {}],
     ["a column change", { columnId: "x" }],
     ["a position change", { position: 3 }],
-    ["a different project", { projectId: "x" }],
+    ["a different list", { listId: "x" }],
     ["a different author", { createdById: "x" }],
   ])("rejects %s", async (_label, extra) => {
-    const { projectId, taskId } = await createProjectFor(world);
-    const before = await snapshot(projectId);
-    const res = await patch(projectId, taskId, {
+    const { listId, taskId } = await createListFor(world);
+    const before = await snapshotList(listId);
+    const res = await patch(listId, taskId, {
       ...extra,
       expectedBoardVersion: 0,
     });
     expect(res.status).toBe(400);
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 
-  it("rejects an assignee outside the project", async () => {
-    const { projectId, taskId } = await createProjectFor(world);
-    const before = await snapshot(projectId);
-    const res = await patch(projectId, taskId, {
+  it("rejects an assignee outside the list", async () => {
+    const { listId, taskId } = await createListFor(world);
+    const before = await snapshotList(listId);
+    const res = await patch(listId, taskId, {
       assigneeId: world.stranger.id,
       expectedBoardVersion: 0,
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe("INVALID_ASSIGNEE");
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 
-  it("answers 404 for a task of another project, even when the caller is in both", async () => {
-    const a = await createProjectFor(world);
-    const b = await createProjectFor(world);
-    const before = await snapshot(b.projectId);
+  it("answers 404 for a task of another list, even when the caller is in both", async () => {
+    const a = await createListFor(world);
+    const b = await createListFor(world);
+    const before = await snapshotList(b.listId);
 
-    const res = await patch(a.projectId, b.taskId, {
+    const res = await patch(a.listId, b.taskId, {
       title: "Hijacked",
       expectedBoardVersion: 0,
     });
 
     expect(res.status).toBe(404);
-    expect(await snapshot(b.projectId)).toBe(before);
+    expect(await snapshotList(b.listId)).toBe(before);
     expect(
       (await db.task.findUniqueOrThrow({ where: { id: b.taskId } })).title,
     ).not.toBe("Hijacked");
   });
 
   it("refuses a stale version with 409 and changes nothing", async () => {
-    const { projectId, taskId } = await createProjectFor(world);
-    const before = await snapshot(projectId);
-    const res = await patch(projectId, taskId, {
+    const { listId, taskId } = await createListFor(world);
+    const before = await snapshotList(listId);
+    const res = await patch(listId, taskId, {
       title: "Late",
       expectedBoardVersion: 9,
     });
@@ -388,19 +397,19 @@ describe("editing a task", () => {
       code: "BOARD_CONFLICT",
       currentVersion: 0,
     });
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 });
 
 describe("deleting a task", () => {
   it("removes it and closes the gap in its column", async () => {
-    const { projectId } = await createProjectFor(world); // position 0 exists
-    const columnId = await firstColumn(projectId);
+    const { listId } = await createListFor(world); // position 0 exists
+    const columnId = await firstColumn(listId);
     const ids: string[] = [];
     let version = 0;
     for (const title of ["B", "C", "D"]) {
       const res = await create(
-        projectId,
+        listId,
         draft(columnId, { title, expectedBoardVersion: version }),
       );
       const { task, boardVersion } = await res.json();
@@ -409,11 +418,11 @@ describe("deleting a task", () => {
     }
     // positions: fixture 0, B 1, C 2, D 3 -> delete B
 
-    const res = await remove(projectId, ids[0]!, version);
+    const res = await remove(listId, ids[0]!, version);
     expect(res.status).toBe(204);
 
     const left = await db.task.findMany({
-      where: { projectId, columnId },
+      where: { listId, columnId },
       orderBy: { position: "asc" },
       select: { title: true, position: true },
     });
@@ -425,14 +434,11 @@ describe("deleting a task", () => {
   });
 
   it("does not move tasks in other columns", async () => {
-    const { projectId, taskId } = await createProjectFor(world);
-    const other = await create(
-      projectId,
-      draft(await firstColumn(projectId, 1)),
-    );
+    const { listId, taskId } = await createListFor(world);
+    const other = await create(listId, draft(await firstColumn(listId, 1)));
     const otherTask = (await other.json()).task;
 
-    expect((await remove(projectId, taskId, 1)).status).toBe(204);
+    expect((await remove(listId, taskId, 1)).status).toBe(204);
 
     const row = await db.task.findUniqueOrThrow({
       where: { id: otherTask.id },
@@ -440,14 +446,14 @@ describe("deleting a task", () => {
     expect(row.position).toBe(0);
   });
 
-  it("answers 404 for a task of another project and 409 for a stale version", async () => {
-    const a = await createProjectFor(world);
-    const b = await createProjectFor(world);
+  it("answers 404 for a task of another list and 409 for a stale version", async () => {
+    const a = await createListFor(world);
+    const b = await createListFor(world);
 
-    expect((await remove(a.projectId, b.taskId, 0)).status).toBe(404);
+    expect((await remove(a.listId, b.taskId, 0)).status).toBe(404);
     expect(await db.task.count({ where: { id: b.taskId } })).toBe(1);
 
-    const stale = await remove(a.projectId, a.taskId, 5);
+    const stale = await remove(a.listId, a.taskId, 5);
     expect(stale.status).toBe(409);
     expect(await db.task.count({ where: { id: a.taskId } })).toBe(1);
   });
@@ -455,28 +461,27 @@ describe("deleting a task", () => {
 
 describe("the board snapshot", () => {
   it("returns ordered columns, ordered tasks, members and the version together", async () => {
-    const { projectId } = await createProjectFor(world);
-    const col1 = await firstColumn(projectId, 1);
-    await create(projectId, draft(col1, { title: "In progress A" }));
+    const { listId } = await createListFor(world);
+    const col1 = await firstColumn(listId, 1);
+    await create(listId, draft(col1, { title: "In progress A" }));
     await create(
-      projectId,
+      listId,
       draft(col1, { title: "In progress B", expectedBoardVersion: 1 }),
     );
 
     const res = await callAs(
-      world.viewer,
+      world.guest,
       boardRoute.GET,
-      req("GET", href(projectId, "/board")),
-      { projectId },
+      req("GET", href(listId, "/board")),
+      { listId },
     );
     expect(res.status).toBe(200);
     const board = await res.json();
 
-    expect(board.project).toMatchObject({
-      id: projectId,
+    expect(board.list).toMatchObject({
+      id: listId,
       boardVersion: 2,
-      role: "VIEWER",
-      isOwner: false,
+      role: "GUEST",
     });
     expect(board.columns.map((c: { name: string }) => c.name)).toEqual([
       "To do",
@@ -489,9 +494,9 @@ describe("the board snapshot", () => {
     ).toEqual(["In progress A", "In progress B"]);
     expect(board.members.map((m: { role: string }) => m.role).sort()).toEqual([
       "ADMIN",
-      "ADMIN",
+      "GUEST",
       "MEMBER",
-      "VIEWER",
+      "OWNER",
     ]);
     expect(JSON.stringify(board)).not.toMatch(/@example\.test|publicId|token/i);
   });

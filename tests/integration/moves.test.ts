@@ -2,17 +2,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { moveTask as modelMove } from "@/lib/board-order";
 import { callAs, cleanupTestData, type Actor } from "../helpers/actors";
 import {
-  createProjectFor,
+  createListFor,
   createWorld,
-  snapshot,
+  snapshotList,
   type World,
 } from "../helpers/world";
 
 const { db } = await import("@/server/db");
 const moveRoute =
-  await import("@/app/api/projects/[projectId]/tasks/[taskId]/move/route");
-const versionRoute =
-  await import("@/app/api/projects/[projectId]/version/route");
+  await import("@/app/api/lists/[listId]/tasks/[taskId]/move/route");
+const versionRoute = await import("@/app/api/lists/[listId]/version/route");
 
 const BASE = "http://localhost:3000";
 const HEADERS = { origin: BASE, "content-type": "application/json" };
@@ -25,7 +24,7 @@ beforeAll(async () => {
 afterAll(cleanupTestData);
 
 const move = (
-  projectId: string,
+  listId: string,
   taskId: string,
   body: object,
   actor: Actor | null = world.owner,
@@ -33,26 +32,26 @@ const move = (
   callAs(
     actor,
     moveRoute.PATCH,
-    new Request(`${BASE}/api/projects/${projectId}/tasks/${taskId}/move`, {
+    new Request(`${BASE}/api/lists/${listId}/tasks/${taskId}/move`, {
       method: "PATCH",
       headers: HEADERS,
       body: JSON.stringify(body),
     }),
-    { projectId, taskId },
+    { listId, taskId },
   );
 
-/** A project whose four columns hold `counts` tasks each (the fixture task is removed first). */
+/** A list whose four columns hold `counts` tasks each (the fixture task is removed first). */
 async function seed(counts: number[]) {
-  const { projectId, taskId } = await createProjectFor(world);
+  const { listId, taskId } = await createListFor(world);
   await db.task.delete({ where: { id: taskId } });
   const columns = await db.boardColumn.findMany({
-    where: { projectId },
+    where: { listId },
     orderBy: { position: "asc" },
   });
   for (const [i, column] of columns.entries()) {
     await db.task.createMany({
       data: Array.from({ length: counts[i]! }, (_, p) => ({
-        projectId,
+        listId,
         columnId: column.id,
         title: `c${i}-t${p}`,
         position: p,
@@ -60,12 +59,12 @@ async function seed(counts: number[]) {
       })),
     });
   }
-  return projectId;
+  return listId;
 }
 
-async function readBoard(projectId: string) {
+async function readBoard(listId: string) {
   const columns = await db.boardColumn.findMany({
-    where: { projectId },
+    where: { listId },
     orderBy: { position: "asc" },
     select: {
       id: true,
@@ -81,39 +80,38 @@ async function readBoard(projectId: string) {
 const orderOf = (columns: Awaited<ReturnType<typeof readBoard>>) =>
   columns.map((c) => c.tasks.map((t) => t.id));
 
-const version = async (projectId: string) =>
-  (await db.project.findUniqueOrThrow({ where: { id: projectId } }))
-    .boardVersion;
+const version = async (listId: string) =>
+  (await db.list.findUniqueOrThrow({ where: { id: listId } })).boardVersion;
 
 describe("moving a task", () => {
   it("reorders inside a column and closes no gaps", async () => {
-    const projectId = await seed([4, 0, 0, 0]);
-    const [col] = await readBoard(projectId);
+    const listId = await seed([4, 0, 0, 0]);
+    const [col] = await readBoard(listId);
     const [a, b, c, d] = col!.tasks.map((t) => t.id);
 
     // a: first -> last
-    let res = await move(projectId, a!, {
+    let res = await move(listId, a!, {
       columnId: col!.id,
       toIndex: 3,
       expectedBoardVersion: 0,
     });
     expect(res.status).toBe(200);
     expect((await res.json()).boardVersion).toBe(1);
-    expect(orderOf(await readBoard(projectId))[0]).toEqual([b, c, d, a]);
+    expect(orderOf(await readBoard(listId))[0]).toEqual([b, c, d, a]);
 
     // a: last -> first
-    res = await move(projectId, a!, {
+    res = await move(listId, a!, {
       columnId: col!.id,
       toIndex: 0,
       expectedBoardVersion: 1,
     });
     expect(res.status).toBe(200);
-    expect(orderOf(await readBoard(projectId))[0]).toEqual([a, b, c, d]);
+    expect(orderOf(await readBoard(listId))[0]).toEqual([a, b, c, d]);
   });
 
   it("moves to another column at the start, the middle, the end and into an empty one", async () => {
-    const projectId = await seed([3, 2, 0, 0]);
-    let [c0, c1, c2] = await readBoard(projectId);
+    const listId = await seed([3, 2, 0, 0]);
+    let [c0, c1, c2] = await readBoard(listId);
     const [x, y, z] = c0!.tasks.map((t) => t.id);
     const [p, q] = c1!.tasks.map((t) => t.id);
 
@@ -125,7 +123,7 @@ describe("moving a task", () => {
     ];
     let v = 0;
     for (const [taskId, columnId, toIndex, expected] of steps) {
-      const res = await move(projectId, taskId, {
+      const res = await move(listId, taskId, {
         columnId,
         toIndex,
         expectedBoardVersion: v,
@@ -133,19 +131,19 @@ describe("moving a task", () => {
       expect(res.status).toBe(200);
       v = (await res.json()).boardVersion;
       expect(
-        orderOf(await readBoard(projectId)).slice(0, expected.length),
+        orderOf(await readBoard(listId)).slice(0, expected.length),
       ).toEqual(expected);
     }
-    [c0, c1, c2] = await readBoard(projectId);
+    [c0, c1, c2] = await readBoard(listId);
     expect(c0!.tasks).toHaveLength(0);
   });
 
   it("changes nothing, and does not raise the version, when the task stays where it is", async () => {
-    const projectId = await seed([3, 0, 0, 0]);
-    const [col] = await readBoard(projectId);
-    const before = await snapshot(projectId);
+    const listId = await seed([3, 0, 0, 0]);
+    const [col] = await readBoard(listId);
+    const before = await snapshotList(listId);
 
-    const res = await move(projectId, col!.tasks[1]!.id, {
+    const res = await move(listId, col!.tasks[1]!.id, {
       columnId: col!.id,
       toIndex: 1,
       expectedBoardVersion: 0,
@@ -153,12 +151,12 @@ describe("moving a task", () => {
 
     expect(res.status).toBe(200);
     expect((await res.json()).boardVersion).toBe(0);
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 
   it("keeps the board identical to a pure model over 60 random moves", async () => {
-    const projectId = await seed([4, 3, 0, 2]);
-    let model = (await readBoard(projectId)).map((c) => ({
+    const listId = await seed([4, 3, 0, 2]);
+    let model = (await readBoard(listId)).map((c) => ({
       id: c.id,
       tasks: c.tasks.map((t) => ({ id: t.id })),
     }));
@@ -179,7 +177,7 @@ describe("moving a task", () => {
       const toIndex = random(others + 1);
 
       const next = modelMove(model, taskId, target.id, toIndex)!;
-      const res = await move(projectId, taskId, {
+      const res = await move(listId, taskId, {
         columnId: target.id,
         toIndex,
         expectedBoardVersion: expectedVersion,
@@ -188,7 +186,7 @@ describe("moving a task", () => {
       if (next !== model) expectedVersion += 1;
       model = next;
 
-      const stored = await readBoard(projectId);
+      const stored = await readBoard(listId);
       expect(orderOf(stored), `order after move ${i}`).toEqual(
         model.map((c) => c.tasks.map((t) => t.id)),
       );
@@ -197,7 +195,7 @@ describe("moving a task", () => {
           column.tasks.map((_, index) => index),
         );
       }
-      expect(await version(projectId), `version after move ${i}`).toBe(
+      expect(await version(listId), `version after move ${i}`).toBe(
         expectedVersion,
       );
     }
@@ -227,11 +225,11 @@ describe("rejected moves leave the board untouched", () => {
       "VALIDATION_ERROR",
     ],
   ])("%s", async (_label, extra, status, code) => {
-    const projectId = await seed([3, 1, 0, 0]);
-    const [c0] = await readBoard(projectId);
-    const before = await snapshot(projectId);
+    const listId = await seed([3, 1, 0, 0]);
+    const [c0] = await readBoard(listId);
+    const before = await snapshotList(listId);
 
-    const res = await move(projectId, c0!.tasks[0]!.id, {
+    const res = await move(listId, c0!.tasks[0]!.id, {
       columnId: c0!.id,
       expectedBoardVersion: 0,
       ...extra,
@@ -239,24 +237,24 @@ describe("rejected moves leave the board untouched", () => {
 
     expect(res.status).toBe(status);
     expect((await res.json()).error.code).toBe(code);
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 
   it("rejects the first index past the end of another column, but accepts the last valid one", async () => {
-    const projectId = await seed([3, 1, 0, 0]);
-    const [c0, c1] = await readBoard(projectId);
-    const before = await snapshot(projectId);
+    const listId = await seed([3, 1, 0, 0]);
+    const [c0, c1] = await readBoard(listId);
+    const before = await snapshotList(listId);
 
-    const past = await move(projectId, c0!.tasks[0]!.id, {
+    const past = await move(listId, c0!.tasks[0]!.id, {
       columnId: c1!.id,
       toIndex: 2, // column 1 has one task, so 0 and 1 are valid
       expectedBoardVersion: 0,
     });
     expect(past.status).toBe(400);
     expect((await past.json()).error.code).toBe("INVALID_POSITION");
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
 
-    const last = await move(projectId, c0!.tasks[0]!.id, {
+    const last = await move(listId, c0!.tasks[0]!.id, {
       columnId: c1!.id,
       toIndex: 1,
       expectedBoardVersion: 0,
@@ -264,13 +262,13 @@ describe("rejected moves leave the board untouched", () => {
     expect(last.status).toBe(200);
   });
 
-  it("refuses a column of another project and a task of another project", async () => {
+  it("refuses a column of another list and a task of another list", async () => {
     const mine = await seed([2, 0, 0, 0]);
     const other = await seed([2, 0, 0, 0]);
     const [myCol] = await readBoard(mine);
     const [otherCol] = await readBoard(other);
-    const beforeMine = await snapshot(mine);
-    const beforeOther = await snapshot(other);
+    const beforeMine = await snapshotList(mine);
+    const beforeOther = await snapshotList(other);
 
     const wrongColumn = await move(mine, myCol!.tasks[0]!.id, {
       columnId: otherCol!.id,
@@ -287,20 +285,20 @@ describe("rejected moves leave the board untouched", () => {
     });
     expect(wrongTask.status).toBe(404);
 
-    expect(await snapshot(mine)).toBe(beforeMine);
-    expect(await snapshot(other)).toBe(beforeOther);
+    expect(await snapshotList(mine)).toBe(beforeMine);
+    expect(await snapshotList(other)).toBe(beforeOther);
   });
 
   it("refuses a stale version with 409 and the current one in the answer", async () => {
-    const projectId = await seed([2, 0, 0, 0]);
-    await db.project.update({
-      where: { id: projectId },
+    const listId = await seed([2, 0, 0, 0]);
+    await db.list.update({
+      where: { id: listId },
       data: { boardVersion: 4 },
     });
-    const [c0] = await readBoard(projectId);
-    const before = await snapshot(projectId);
+    const [c0] = await readBoard(listId);
+    const before = await snapshotList(listId);
 
-    const res = await move(projectId, c0!.tasks[0]!.id, {
+    const res = await move(listId, c0!.tasks[0]!.id, {
       columnId: c0!.id,
       toIndex: 1,
       expectedBoardVersion: 1,
@@ -311,23 +309,23 @@ describe("rejected moves leave the board untouched", () => {
       code: "BOARD_CONFLICT",
       currentVersion: 4,
     });
-    expect(await snapshot(projectId)).toBe(before);
+    expect(await snapshotList(listId)).toBe(before);
   });
 });
 
 describe("two moves with the same version", () => {
   it("lets exactly one win; the other gets 409, and the order stays valid", async () => {
-    const projectId = await seed([3, 3, 0, 0]);
-    const [c0, c1] = await readBoard(projectId);
+    const listId = await seed([3, 3, 0, 0]);
+    const [c0, c1] = await readBoard(listId);
 
     const [byOwner, byMember] = await Promise.all([
-      move(projectId, c0!.tasks[0]!.id, {
+      move(listId, c0!.tasks[0]!.id, {
         columnId: c1!.id,
         toIndex: 0,
         expectedBoardVersion: 0,
       }),
       move(
-        projectId,
+        listId,
         c1!.tasks[0]!.id,
         { columnId: c0!.id, toIndex: 0, expectedBoardVersion: 0 },
         world.member,
@@ -335,42 +333,40 @@ describe("two moves with the same version", () => {
     ]);
 
     expect([byOwner.status, byMember.status].sort()).toEqual([200, 409]);
-    expect(await version(projectId)).toBe(1);
-    for (const column of await readBoard(projectId)) {
+    expect(await version(listId)).toBe(1);
+    for (const column of await readBoard(listId)) {
       expect(column.tasks.map((t) => t.position)).toEqual(
         column.tasks.map((_, i) => i),
       );
     }
-    expect((await readBoard(projectId)).flatMap((c) => c.tasks)).toHaveLength(
-      6,
-    );
+    expect((await readBoard(listId)).flatMap((c) => c.tasks)).toHaveLength(6);
   });
 });
 
 describe("the version endpoint", () => {
-  const read = (projectId: string, actor: Actor | null) =>
+  const read = (listId: string, actor: Actor | null) =>
     callAs(
       actor,
       versionRoute.GET,
-      new Request(`${BASE}/api/projects/${projectId}/version`),
+      new Request(`${BASE}/api/lists/${listId}/version`),
       {
-        projectId,
+        listId,
       },
     );
 
   it("returns the current version to members only, uncached", async () => {
-    const projectId = await seed([1, 0, 0, 0]);
-    await db.project.update({
-      where: { id: projectId },
+    const listId = await seed([1, 0, 0, 0]);
+    await db.list.update({
+      where: { id: listId },
       data: { boardVersion: 7 },
     });
 
-    const ok = await read(projectId, world.viewer);
+    const ok = await read(listId, world.guest);
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ boardVersion: 7 });
     expect(ok.headers.get("cache-control")).toContain("no-store");
 
-    expect((await read(projectId, world.stranger)).status).toBe(404);
-    expect((await read(projectId, null)).status).toBe(401);
+    expect((await read(listId, world.stranger)).status).toBe(404);
+    expect((await read(listId, null)).status).toBe(401);
   });
 });

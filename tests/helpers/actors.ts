@@ -2,7 +2,7 @@ import { db } from "@/server/db";
 import { setRequestHeaders } from "./request-context";
 import { testAuth } from "./test-auth";
 
-export type Actor = { id: string; cookie: string };
+export type Actor = { id: string; email: string; cookie: string };
 
 /** A real user with a real database session, created through the test-only helpers. */
 export async function createActor(label: string): Promise<Actor> {
@@ -13,7 +13,11 @@ export async function createActor(label: string): Promise<Actor> {
   });
   await ctx.test.saveUser(user);
   const headers = await ctx.test.getAuthHeaders({ userId: user.id });
-  return { id: user.id, cookie: headers.get("cookie") ?? "" };
+  return {
+    id: user.id,
+    email: user.email,
+    cookie: headers.get("cookie") ?? "",
+  };
 }
 
 /** Calls a route handler as `actor` (or anonymously with null) with Next-style params. */
@@ -31,9 +35,13 @@ export function callAs<P extends object>(
 }
 
 export async function cleanupTestData() {
-  // Projects first: their owners are protected by a foreign key.
-  await db.project.deleteMany({
-    where: { owner: { email: { endsWith: "@example.test" } } },
+  // Workspaces first (with everything in them): their members are protected by a foreign key.
+  await db.workspace.deleteMany({
+    where: {
+      members: {
+        some: { role: "OWNER", user: { email: { endsWith: "@example.test" } } },
+      },
+    },
   });
   await db.user.deleteMany({ where: { email: { endsWith: "@example.test" } } });
 }

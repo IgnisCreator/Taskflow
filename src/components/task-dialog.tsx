@@ -42,7 +42,7 @@ export type DialogState =
  * version, and a second save repeats the user's intent knowingly.
  */
 export function TaskDialog({
-  projectId,
+  listId,
   columns,
   members,
   canWrite,
@@ -52,7 +52,7 @@ export function TaskDialog({
   onMove,
   onClose,
 }: {
-  projectId: string;
+  listId: string;
   columns: ColumnView[];
   members: MemberView[];
   canWrite: boolean;
@@ -88,7 +88,7 @@ export function TaskDialog({
       if (result.currentVersion !== undefined)
         setAdoptedVersion(result.currentVersion);
       setError(
-        "The project changed while this was open. Your changes are still here; check the board and save again.",
+        "The board changed while this was open. Your changes are still here; check the board and save again.",
       );
     } else {
       setError(result.message);
@@ -111,14 +111,14 @@ export function TaskDialog({
     setError(null);
     const result =
       state.mode === "create"
-        ? await api("POST", `/api/projects/${projectId}/tasks`, {
+        ? await api("POST", `/api/lists/${listId}/tasks`, {
             ...fields,
             id: state.draftId, // kept while the dialog is open, so a retry cannot duplicate
             columnId: state.columnId,
           })
         : await api(
             "PATCH",
-            `/api/projects/${projectId}/tasks/${state.task.id}`,
+            `/api/lists/${listId}/tasks/${state.task.id}`,
             fields,
           );
     setPending(false);
@@ -133,7 +133,7 @@ export function TaskDialog({
     setError(null);
     const result = await api(
       "DELETE",
-      `/api/projects/${projectId}/tasks/${task.id}`,
+      `/api/lists/${listId}/tasks/${task.id}`,
       { expectedBoardVersion: version },
     );
     setPending(false);

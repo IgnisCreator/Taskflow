@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/server/session";
 const FEATURES = [
   {
     title: "Shared boards",
-    text: "Invite up to five people to a project. Everyone sees the same board and changes show up within seconds.",
+    text: "Bring up to 20 people into a workspace, with spaces, folders and lists. Everyone sees the same boards and changes show up within seconds.",
   },
   {
     title: "Roles that make sense",
@@ -52,7 +52,7 @@ const EXAMPLE = [
 export default async function HomePage() {
   const user = await getCurrentUser();
   const cta = user
-    ? { href: "/projects", label: "Go to your projects" }
+    ? { href: "/workspaces", label: "Go to your workspaces" }
     : { href: "/login", label: "Sign in with GitHub" };
 
   return (
@@ -63,8 +63,8 @@ export default async function HomePage() {
           See what your team is working on, at a glance
         </h1>
         <p className="mx-auto max-w-xl text-lg text-muted">
-          TaskFlow is a Kanban board for small teams. Create a project, add
-          tasks, and move them from idea to done together.
+          TaskFlow is a Kanban tool for teams. Organise your work in spaces and
+          lists, add tasks, and move them from idea to done together.
         </p>
         <p className="flex flex-wrap justify-center gap-3">
           <Link href={cta.href} className="btn px-5 py-3 text-base">
@@ -145,8 +145,8 @@ export default async function HomePage() {
       <section className="card space-y-4 text-center">
         <h2 className="text-2xl font-semibold">Ready to try it?</h2>
         <p className="text-muted">
-          Sign in with GitHub, create a project, and your board is ready with
-          four columns.
+          Sign in, create a workspace, and every new list starts with four
+          columns.
         </p>
         <p>
           <Link href={cta.href} className="btn px-5 py-3 text-base">

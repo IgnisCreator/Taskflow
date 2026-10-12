@@ -1,31 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { can, canManageMember, type Actor } from "../../src/server/policies";
+import {
+  can,
+  canManageMember,
+  canSeeSpace,
+  type Actor,
+} from "../../src/server/policies";
 
-const owner: Actor = { role: "ADMIN", isOwner: true };
-const admin: Actor = { role: "ADMIN", isOwner: false };
-const member: Actor = { role: "MEMBER", isOwner: false };
-const viewer: Actor = { role: "VIEWER", isOwner: false };
-const callers = [owner, admin, member, viewer];
+const roles = ["OWNER", "ADMIN", "MEMBER", "GUEST"] as const;
+const callers: Actor[] = roles.map((role) => ({ role }));
 
-describe("project permissions", () => {
+describe("workspace permissions", () => {
   it.each([
-    ["project:view", [true, true, true, true]],
-    ["project:edit", [true, true, false, false]],
-    ["project:delete", [true, false, false, false]],
+    ["workspace:edit", [true, true, false, false]],
+    ["workspace:delete", [true, false, false, false]],
     ["member:manage", [true, true, false, false]],
+    ["structure:manage", [true, true, false, false]],
     ["task:write", [true, true, true, false]],
-  ] as const)("%s for owner, admin, member, viewer", (action, expected) => {
+  ] as const)("%s for owner, admin, member, guest", (action, expected) => {
     expect(callers.map((a) => can(a, action))).toEqual(expected);
   });
 });
 
+describe("seeing a space", () => {
+  it.each([
+    ["public, not listed", false, false, [true, true, true, false]],
+    ["public, listed", false, true, [true, true, true, true]],
+    ["private, not listed", true, false, [true, true, false, false]],
+    ["private, listed", true, true, [true, true, true, true]],
+  ] as const)(
+    "%s: owner, admin, member, guest",
+    (_name, isPrivate, listed, expected) => {
+      expect(roles.map((r) => canSeeSpace(r, { isPrivate }, listed))).toEqual(
+        expected,
+      );
+    },
+  );
+});
+
 describe("managing members", () => {
-  const cases = [
+  it.each([
     ["add a MEMBER", { to: "MEMBER" }, [true, true, false, false]],
     ["add an ADMIN", { to: "ADMIN" }, [true, false, false, false]],
     [
-      "change MEMBER to VIEWER",
-      { from: "MEMBER", to: "VIEWER" },
+      "change MEMBER to GUEST",
+      { from: "MEMBER", to: "GUEST" },
       [true, true, false, false],
     ],
     [
@@ -33,30 +51,19 @@ describe("managing members", () => {
       { from: "ADMIN", to: "MEMBER" },
       [true, false, false, false],
     ],
-    ["remove a VIEWER", { from: "VIEWER" }, [true, true, false, false]],
+    ["remove a GUEST", { from: "GUEST" }, [true, true, false, false]],
     ["remove an ADMIN", { from: "ADMIN" }, [true, false, false, false]],
-  ] as const;
-
-  it.each(cases)(
-    "%s: owner, admin, member, viewer",
-    (_name, change, expected) => {
-      expect(
-        callers.map((a) =>
-          canManageMember(a, { ...change, targetIsOwner: false }),
-        ),
-      ).toEqual(expected);
-    },
-  );
-
-  it("nobody can touch the owner", () => {
-    expect(
-      callers.map((a) =>
-        canManageMember(a, {
-          from: "ADMIN",
-          to: "VIEWER",
-          targetIsOwner: true,
-        }),
-      ),
-    ).toEqual([false, false, false, false]);
+    [
+      "touch the OWNER",
+      { from: "OWNER", to: "GUEST" },
+      [false, false, false, false],
+    ],
+    [
+      "grant OWNER",
+      { from: "MEMBER", to: "OWNER" },
+      [false, false, false, false],
+    ],
+  ] as const)("%s: owner, admin, member, guest", (_name, change, expected) => {
+    expect(callers.map((a) => canManageMember(a, change))).toEqual(expected);
   });
 });

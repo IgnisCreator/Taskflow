@@ -34,7 +34,7 @@ export function ThemeToggle({ initial }: { initial: Theme }) {
   return (
     <button
       type="button"
-      className="btn-secondary ml-auto px-2 py-1 text-xs"
+      className="btn-secondary ml-auto px-2 py-1 text-xs whitespace-nowrap"
       aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[NEXT[theme]]}`}
       onClick={() => choose(NEXT[theme])}
     >

@@ -11,14 +11,9 @@ export default async function ProfilePage() {
       <h1 className="text-2xl font-semibold">Profile</h1>
       <div className="card space-y-4">
         <p className="text-lg font-medium">{user.name}</p>
-        <div>
-          <p className="text-sm text-muted">
-            Your public ID. Share it so a project admin can add you.
-          </p>
-          <code className="mt-1 block break-all rounded bg-subtle px-3 py-2 text-sm">
-            {user.publicId}
-          </code>
-        </div>
+        <p className="text-sm text-muted">
+          To join a workspace, give its admin the email you sign in with.
+        </p>
         <LogoutButton />
       </div>
     </main>
