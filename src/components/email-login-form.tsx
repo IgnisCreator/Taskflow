@@ -26,6 +26,7 @@ export function EmailLoginForm() {
             name: String(form.get("name")),
             email,
             password,
+            digestEmail: form.get("digestEmail") === "on",
             callbackURL,
           })
         : await authClient.signIn.email({ email, password, callbackURL });
@@ -89,7 +90,13 @@ export function EmailLoginForm() {
         />
       </label>
       {mode === "signup" && (
-        <p className="text-xs text-muted">At least 10 characters.</p>
+        <>
+          <p className="text-xs text-muted">At least 10 characters.</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="digestEmail" />
+            Send me a daily summary of the alerts of my lists
+          </label>
+        </>
       )}
       {error && (
         <p role="alert" className="error">
