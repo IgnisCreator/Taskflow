@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import {
+  E2E_CRON_SECRET,
   E2E_DATABASE_URL,
   E2E_ORIGIN,
   E2E_PORT,
@@ -28,6 +29,7 @@ export default defineConfig({
       AUTH_GITHUB_ID: "e2e-placeholder",
       AUTH_GITHUB_SECRET: "e2e-placeholder",
       APP_URL: E2E_ORIGIN,
+      CRON_SECRET: E2E_CRON_SECRET,
     },
   },
 });

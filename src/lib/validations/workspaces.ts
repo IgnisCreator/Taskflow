@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALERT_LIMITS } from "@/lib/alerts";
 
 // Unknown keys are rejected (not stripped): ids, roles of others, versions... never come in by accident.
 const name = z.string().trim().min(1).max(80);
@@ -95,15 +96,32 @@ export const createListSchema = z.strictObject({
   description: description.optional().transform((value) => value ?? null),
 });
 
+const alertDays = z.coerce
+  .number()
+  .int()
+  .min(ALERT_LIMITS.days.min)
+  .max(ALERT_LIMITS.days.max);
+
 export const updateListSchema = z
   .strictObject({
     name: name.optional(),
     description: description.optional(),
+    /** Thresholds of the daily alerts; a form sends them as text, hence the coercion. */
+    alertBandDays: alertDays.optional(),
+    alertWipDays: alertDays.optional(),
+    alertDropPercent: z.coerce
+      .number()
+      .int()
+      .min(ALERT_LIMITS.dropPercent.min)
+      .max(ALERT_LIMITS.dropPercent.max)
+      .optional(),
     expectedBoardVersion,
   })
-  .refine((v) => v.name !== undefined || v.description !== undefined, {
-    message: "Provide a name or a description",
-  });
+  .refine(
+    ({ expectedBoardVersion: _version, ...changes }) =>
+      Object.values(changes).some((value) => value !== undefined),
+    { message: "Provide something to change" },
+  );
 
 /** Body of every list write that only needs the version (deleting a list). */
 export const versionedSchema = z.strictObject({ expectedBoardVersion });

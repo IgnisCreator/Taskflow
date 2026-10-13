@@ -36,6 +36,12 @@ ${url}
 The link works for one hour. If you did not create an account, ignore this message.`,
       }),
   },
+  user: {
+    additionalFields: {
+      // Asked at sign-up and editable in the profile; the in-app inbox does not depend on it.
+      digestEmail: { type: "boolean", required: false, defaultValue: false },
+    },
+  },
   socialProviders: {
     github: {
       clientId: env.AUTH_GITHUB_ID,
