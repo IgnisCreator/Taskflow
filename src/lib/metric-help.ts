@@ -5,8 +5,17 @@ export const KANBAN_GUIDE = "https://kanbanguides.org/english/";
 export const KANBAN_GLOSSARY =
   "https://kanban.university/wp-content/uploads/2023/04/The-Official-Kanban-Guide_Glossary.pdf";
 
+export const FORECAST_SOURCE =
+  "https://prokanban.org/kanban-playbook/forecasting-delivery";
+
 export type MetricKey =
-  "cfd" | "cycleTime" | "aging" | "throughput" | "wip" | "efficiency";
+  | "forecast"
+  | "cfd"
+  | "cycleTime"
+  | "aging"
+  | "throughput"
+  | "wip"
+  | "efficiency";
 
 export const METRIC_HELP: Record<
   MetricKey,
@@ -52,6 +61,13 @@ export const METRIC_HELP: Record<
     why: "Starting less and finishing more is faster: too much work at once slows everything down.",
     read: "A stage over its limit is a signal to finish something before pulling more in. Limits here are advice, nothing is blocked.",
     source: { label: "Kanban Guide", url: KANBAN_GUIDE },
+  },
+  forecast: {
+    title: "Monte Carlo forecast",
+    what: "A simulation that replays your own past pace thousands of times to say when a number of tasks will be done, or how many will be done by a date, with a probability for each answer.",
+    why: "A single date hides the uncertainty; probabilities let you promise what you can keep, and the 85% answer is the one most teams commit to.",
+    read: "Read it as 'in 85 out of 100 simulated futures it was done by this date'. 50% is a coin toss, never a promise. It assumes the future looks like the window you chose: if the process changed, shorten the window.",
+    source: { label: "ProKanban: forecasting delivery", url: FORECAST_SOURCE },
   },
   efficiency: {
     title: "Flow efficiency",

@@ -64,6 +64,9 @@ export default async function ListPage({
             <Link href={`/lists/${list.id}/metrics`} className="btn-secondary">
               Metrics
             </Link>
+            <Link href={`/lists/${list.id}/forecast`} className="btn-secondary">
+              Forecast
+            </Link>
             <Link href={`/lists/${list.id}/activity`} className="btn-secondary">
               Activity
             </Link>

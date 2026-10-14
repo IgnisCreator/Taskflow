@@ -19,11 +19,11 @@ export type PanelMetrics = Metrics & {
   titles: Record<string, string>;
 };
 
-const W = 640;
-const H = 260;
-const M = { l: 40, r: 12, t: 12, b: 28 };
-const PLOT_W = W - M.l - M.r;
-const PLOT_H = H - M.t - M.b;
+export const W = 640;
+export const H = 260;
+export const M = { l: 40, r: 12, t: 12, b: 28 };
+export const PLOT_W = W - M.l - M.r;
+export const PLOT_H = H - M.t - M.b;
 
 // Literal class names, so that Tailwind finds them. Two shades alternate inside one category.
 const FILL: Record<Category, [string, string]> = {
@@ -46,7 +46,7 @@ function bucketName(metrics: PanelMetrics, bucket: string): string {
   return removed ? `Deleted stage (${name.toLowerCase()})` : name;
 }
 
-function Svg({
+export function Svg({
   label,
   ticks,
   y,
@@ -102,7 +102,7 @@ function Svg({
   );
 }
 
-function Table({
+export function Table({
   caption,
   head,
   rows,
@@ -281,7 +281,7 @@ export function CfdChart({ metrics }: { metrics: PanelMetrics }) {
 }
 
 /** Horizontal reference line with its label at the right end. */
-function Line({
+export function Line({
   y,
   text,
   className,

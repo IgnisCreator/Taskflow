@@ -27,20 +27,19 @@ export type MetricsQuery = {
 
 /**
  * The range and filters of a metrics request. Without dates it is the last 30 days ending today
- * (UTC). Throws a ZodError (a 400 for the API) for a bad date, an unknown field, a range that ends
+ * (UTC; `defaultDays` days for a caller that wants another default). Throws a ZodError (a 400 for the API) for a bad date, an unknown field, a range that ends
  * before it starts, one that is longer than a year, or one that ends in the future.
  */
 export function parseMetricsQuery(
   params: Record<string, string | string[] | undefined>,
   now: number,
+  defaultDays = DEFAULT_RANGE_DAYS,
 ): MetricsQuery {
   const query = querySchema.parse(params);
   const today = Math.floor(now / DAY_MS) * DAY_MS;
   const ms = (value: string) => Date.parse(`${value}T00:00:00.000Z`);
   const to = query.to ? ms(query.to) : today;
-  const from = query.from
-    ? ms(query.from)
-    : to - (DEFAULT_RANGE_DAYS - 1) * DAY_MS;
+  const from = query.from ? ms(query.from) : to - (defaultDays - 1) * DAY_MS;
   const fail = (message: string, path: string): never => {
     throw new z.ZodError([
       { code: "custom", message, path: [path], input: params },
