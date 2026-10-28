@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { startDemo } from "@/app/demo-actions";
+import { githubLogin } from "@/lib/env";
 import { demoEnabled } from "@/server/services/demo";
 import { getCurrentUser } from "@/server/session";
 
@@ -51,11 +52,19 @@ const EXAMPLE = [
   { name: "Done", cards: ["Pick a date", "Invite the team"] },
 ];
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ demo?: string }>;
+}) {
+  const limited = (await searchParams).demo === "limit";
   const user = await getCurrentUser();
   const cta = user
     ? { href: "/workspaces", label: "Go to your workspaces" }
-    : { href: "/login", label: "Sign in with GitHub" };
+    : {
+        href: "/login",
+        label: githubLogin() ? "Sign in with GitHub" : "Sign in",
+      };
 
   return (
     <main className="space-y-20">
@@ -72,6 +81,12 @@ export default async function HomePage() {
           <Link href={cta.href} className="btn px-5 py-3 text-base">
             {cta.label}
           </Link>
+          {limited && (
+            <span role="alert" className="error w-full">
+              Too many attempts to open the demo from this address. Try again
+              later.
+            </span>
+          )}
           {!user && demoEnabled() && (
             <form action={startDemo}>
               <button

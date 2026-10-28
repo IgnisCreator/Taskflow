@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/server/auth";
+import { DEMO_LIMIT, clientAddress, rateLimit } from "@/server/rate-limit";
 import {
   DEMO_VISITOR_EMAIL,
   demoEnabled,
@@ -16,6 +17,10 @@ import {
  */
 export async function startDemo() {
   if (!demoEnabled()) notFound();
+  const address = clientAddress(await headers());
+  if (address && !(await rateLimit(`demo:${address}`, DEMO_LIMIT)).ok) {
+    redirect("/?demo=limit");
+  }
   const workspaceId = await ensureDemo();
   await auth.api.signInEmail({
     body: { email: DEMO_VISITOR_EMAIL, password: demoPassword() },

@@ -5,6 +5,8 @@ process.env.BETTER_AUTH_SECRET = "test-secret-0123456789abcdef0123456789abcdef";
 process.env.AUTH_GITHUB_ID = "test-github-id";
 process.env.AUTH_GITHUB_SECRET = "test-github-secret";
 process.env.APP_URL = "http://localhost:3000";
+// Tests run as an open deployment (sign-up, GitHub); the closed one has its own tests.
+process.env.OPEN_ACCESS = "1";
 process.env.DATABASE_URL ??=
   "postgresql://taskflow:taskflow@localhost:5432/taskflow";
 

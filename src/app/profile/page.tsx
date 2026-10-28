@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 import { ApiForm } from "@/components/api-form";
+import { ChangePasswordForm } from "@/components/change-password-form";
 import { LogoutButton } from "@/components/logout-button";
-import { getDigestPreference } from "@/server/services/digest";
+import { getDigestPreference, hasPassword } from "@/server/services/digest";
 import { getCurrentUser } from "@/server/session";
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const digest = await getDigestPreference(user.id);
+  // The demo visitor shares one account: it has a password but nobody may change it.
+  const canChangePassword = !user.isDemo && (await hasPassword(user.id));
 
   return (
     <main className="space-y-6">
@@ -31,6 +34,7 @@ export default async function ProfilePage() {
           Email me the open alerts once a day (they are always in Notifications)
         </label>
       </ApiForm>
+      {canChangePassword && <ChangePasswordForm />}
     </main>
   );
 }

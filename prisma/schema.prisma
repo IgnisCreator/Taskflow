@@ -423,3 +423,27 @@ model EmailLog {
 
   @@index([userId, createdAt])
 }
+
+/// Better Auth's request counters (sign-in and the like), kept in PostgreSQL so that every
+/// serverless instance sees the same numbers. The shape is the one Better Auth expects.
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("rateLimit")
+}
+
+/// Our own fixed-window counters (writes of the API per address, entries to the demo).
+model ApiRateLimit {
+  key       String
+  /// The window number: floor(time / window length).
+  window    Int
+  count     Int
+  /// When the row can be deleted.
+  expiresAt DateTime
+
+  @@id([key, window])
+  @@index([expiresAt])
+}
