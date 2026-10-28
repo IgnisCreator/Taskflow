@@ -9,5 +9,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   // Empty fallback lets `prisma generate`/`validate` run without a database (CI, postinstall).
   // Commands that connect (migrate) fail clearly when DATABASE_URL is missing.
-  datasource: { url: process.env.DATABASE_URL ?? "" },
+  // Migrations want a direct connection (Neon's pooled URL does not hold the migration lock);
+  // the app itself keeps using DATABASE_URL.
+  datasource: { url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "" },
 });
