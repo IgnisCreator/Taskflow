@@ -30,6 +30,7 @@ export default defineConfig({
       AUTH_GITHUB_SECRET: "e2e-placeholder",
       APP_URL: E2E_ORIGIN,
       CRON_SECRET: E2E_CRON_SECRET,
+      DEMO_ENABLED: "1",
     },
   },
 });

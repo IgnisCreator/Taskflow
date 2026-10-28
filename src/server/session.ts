@@ -9,6 +9,12 @@ export async function getCurrentUser() {
   if (!session) return null;
   return db.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, image: true, publicId: true },
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      publicId: true,
+      isDemo: true,
+    },
   });
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  assertNotDemo,
   assertSameOrigin,
   handle,
   json,
@@ -16,6 +17,7 @@ const preferencesSchema = z.strictObject({ digestEmail: z.boolean() });
 export const PATCH = handle(async (request: Request) => {
   assertSameOrigin(request);
   const user = await requireUser();
+  assertNotDemo(user);
   const data = await readJson(request, preferencesSchema);
   await db.user.update({ where: { id: user.id }, data });
   return json({ digestEmail: data.digestEmail });

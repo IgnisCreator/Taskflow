@@ -70,6 +70,18 @@ export default async function RootLayout({
             <ThemeToggle initial={theme} />
           </nav>
         </header>
+        {user?.isDemo && (
+          <p
+            role="note"
+            className="border-b border-line bg-subtle px-4 py-2 text-center text-sm"
+          >
+            You are exploring a read-only demo with made-up data. It is renewed
+            every day.{" "}
+            <Link href="/profile" className="link">
+              Leave the demo
+            </Link>
+          </p>
+        )}
         <div id="content" className="mx-auto max-w-6xl px-4 py-8">
           {children}
         </div>

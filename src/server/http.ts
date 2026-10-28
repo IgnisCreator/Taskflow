@@ -75,6 +75,13 @@ export function assertSameOrigin(request: Request) {
   }
 }
 
+/** The demo visitor only looks: the few writes open to any signed-in user refuse them. */
+export function assertNotDemo(user: { isDemo: boolean }) {
+  if (user.isDemo) {
+    throw new ApiError(403, "DEMO_READ_ONLY", "The demo is read-only");
+  }
+}
+
 export async function readJson<T extends z.ZodType>(
   request: Request,
   schema: T,
