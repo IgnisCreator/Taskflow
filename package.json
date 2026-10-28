@@ -19,7 +19,8 @@
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate deploy",
     "test:e2e": "playwright test",
-    "alerts:run": "node --env-file=.env scripts/run-alerts.mjs"
+    "alerts:run": "node --env-file=.env scripts/run-alerts.mjs",
+    "user:create": "node --env-file-if-exists=.env scripts/user-create.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
@@ -27,6 +28,7 @@
     "@prisma/client": "7.10.0",
     "better-auth": "1.7.7",
     "next": "16.4.0",
+    "pg": "8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"

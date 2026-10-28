@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 
 /** Sign in or sign up with email and password. The account works only after the emailed link is opened. */
-export function EmailLoginForm() {
+export function EmailLoginForm({ allowSignUp }: { allowSignUp: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
@@ -106,18 +106,20 @@ export function EmailLoginForm() {
       <button type="submit" disabled={pending} className="btn w-full">
         {mode === "signup" ? "Create account" : "Sign in with email"}
       </button>
-      <button
-        type="button"
-        className="link w-full text-sm"
-        onClick={() => {
-          setMode(mode === "signup" ? "signin" : "signup");
-          setError(null);
-        }}
-      >
-        {mode === "signup"
-          ? "I already have an account"
-          : "Create an account with email"}
-      </button>
+      {allowSignUp && (
+        <button
+          type="button"
+          className="link w-full text-sm"
+          onClick={() => {
+            setMode(mode === "signup" ? "signin" : "signup");
+            setError(null);
+          }}
+        >
+          {mode === "signup"
+            ? "I already have an account"
+            : "Create an account with email"}
+        </button>
+      )}
     </form>
   );
 }

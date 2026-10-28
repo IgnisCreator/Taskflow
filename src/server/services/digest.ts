@@ -14,6 +14,15 @@ export async function getDigestPreference(userId: string) {
   return user.digestEmail;
 }
 
+/** Whether the account has a password (accounts made with GitHub only do not). */
+export async function hasPassword(userId: string) {
+  return (
+    (await db.account.count({
+      where: { userId, providerId: "credential" },
+    })) > 0
+  );
+}
+
 /**
  * The optional daily email: for each user who asked for it and has open alerts, one message listing
  * them. At most one per user per day (checked in EmailLog), and the outcome is always logged.

@@ -2,6 +2,9 @@
 // sessions and data), so both sides use the same secret, origin and database.
 export const E2E_PORT = 3100;
 export const E2E_ORIGIN = `http://localhost:${E2E_PORT}`;
+// The same app, closed as in production: no sign-up and no GitHub login.
+export const E2E_CLOSED_PORT = 3101;
+export const E2E_CLOSED_ORIGIN = `http://localhost:${E2E_CLOSED_PORT}`;
 // Fixed test value: signs the session cookies the fixtures create. Not a real secret.
 export const E2E_SECRET = "e2e-secret-0123456789abcdef0123456789abcdef";
 // Lets the tests call the daily alerts job. Not a real secret.

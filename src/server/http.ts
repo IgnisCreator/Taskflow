@@ -1,6 +1,7 @@
 import "server-only";
 import { z, ZodError } from "zod";
 import { getEnv } from "@/lib/env";
+import { WRITE_LIMIT, clientAddress, rateLimit } from "@/server/rate-limit";
 import { getCurrentUser } from "@/server/session";
 
 /** A failure with a stable code that route handlers turn into `{ error: { code, message, requestId } }`. */
@@ -35,12 +36,36 @@ export function errorResponse(
   return Response.json({ error }, { status, headers: NO_STORE });
 }
 
+const READ_ONLY = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Writes are counted per client address (as the platform reports it; with no address, as in tests
+ * or a plain local run, there is nothing to count by). Over the limit: 429 and when to retry.
+ */
+async function limitWrites(request: unknown): Promise<Response | null> {
+  if (!(request instanceof Request) || READ_ONLY.has(request.method))
+    return null;
+  const address = clientAddress(request.headers);
+  if (!address) return null;
+  const { ok, retryAfter } = await rateLimit(`write:${address}`, WRITE_LIMIT);
+  if (ok) return null;
+  const response = errorResponse(
+    429,
+    "RATE_LIMITED",
+    `Too many requests. Try again in ${retryAfter} seconds.`,
+  );
+  response.headers.set("Retry-After", String(retryAfter));
+  return response;
+}
+
 /** Wraps a route handler: known failures keep their code; anything else is logged without payloads. */
 export function handle<Args extends unknown[]>(
   fn: (...args: Args) => Promise<Response>,
 ) {
   return async (...args: Args): Promise<Response> => {
     try {
+      const limited = await limitWrites(args[0]);
+      if (limited) return limited;
       return await fn(...args);
     } catch (error) {
       if (error instanceof ApiError) {
