@@ -53,3 +53,26 @@ export function parseMetricsQuery(
   }
   return { from, to, type: query.type, assignee: query.assignee };
 }
+
+/**
+ * Like `parseMetricsQuery`, for pages: a bad query is not an error page. It gives the default range
+ * (no filters) and the message to show above it.
+ */
+export function parseMetricsPageQuery(
+  params: Record<string, string | string[] | undefined>,
+  now: number,
+): { query: MetricsQuery; error: string | null } {
+  // A form sends the fields it leaves empty as "": they mean "not set".
+  const set = Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== ""),
+  );
+  try {
+    return { query: parseMetricsQuery(set, now), error: null };
+  } catch (error) {
+    if (!(error instanceof z.ZodError)) throw error;
+    return {
+      query: parseMetricsQuery({}, now),
+      error: error.issues.map((issue) => issue.message).join(". "),
+    };
+  }
+}

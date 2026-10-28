@@ -101,6 +101,12 @@ function Tree({
             ))}
             {space.lists.map(link)}
           </ul>
+          <Link
+            href={`/spaces/${space.id}/metrics`}
+            className="link block px-2 text-xs"
+          >
+            Metrics of {space.name}
+          </Link>
           {admin && (
             <Link
               href={`/spaces/${space.id}`}

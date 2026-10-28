@@ -18,3 +18,6 @@ export async function loadWorkspace(userId: string, workspaceId: string) {
     throw error;
   });
 }
+
+/** For pages: the clock (a page body may not call `Date.now` itself). */
+export const currentTime = () => Date.now();
