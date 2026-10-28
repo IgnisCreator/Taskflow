@@ -1,8 +1,10 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ForecastPanel } from "@/components/forecast-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { parseForecastPageQuery } from "@/lib/validations/forecast";
+import { limitForecast } from "@/server/http";
 import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { getListForecast } from "@/server/services/forecast";
 import { getList } from "@/server/services/lists";
@@ -19,6 +21,7 @@ export default async function ListForecastPage({
   const { listId } = await params;
   const list = await getList(user.id, listId);
   if (!list) notFound();
+  await limitForecast(user.id, await headers());
   const raw = await searchParams;
   const now = currentTime();
   const { query, error } = parseForecastPageQuery(raw, now);

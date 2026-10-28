@@ -21,6 +21,7 @@ const ACCOUNT_CHANGES = new Set([
   "/update-user",
   "/delete-user",
   "/set-password",
+  "/list-sessions", // would show the address and browser of every other visitor
   "/revoke-session",
   "/revoke-sessions",
   "/revoke-other-sessions",

@@ -57,9 +57,10 @@ export async function addMember(
       if (!canManageMember(actor, { to: input.role })) throw forbidden();
       const target = await tx.user.findFirst({
         where: { email: { equals: input.email, mode: "insensitive" } },
-        select: { id: true },
+        select: { id: true, isDemo: true },
       });
-      if (!target) {
+      // The shared demo visitor is never somebody's member: every visitor would write there.
+      if (!target || target.isDemo) {
         throw new ApiError(404, "USER_NOT_FOUND", "No user has that email");
       }
       const members = await tx.workspaceMember.findMany({

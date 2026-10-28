@@ -23,7 +23,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.apiRateLimit.deleteMany({ where: { key: { startsWith: "test:" } } });
   await db.apiRateLimit.deleteMany({
-    where: { key: { startsWith: "write:198.51.100." } },
+    where: {
+      OR: [
+        { key: { startsWith: "write:198.51.100." } },
+        { key: { startsWith: "forecast:" } },
+      ],
+    },
   });
   await db.rateLimit.deleteMany({ where: { key: { contains: "203.0.113." } } });
   await cleanupTestData();
@@ -87,9 +92,51 @@ describe("the rate limiter", () => {
       "198.51.100.4",
     );
     expect(clientAddress(headers({}))).toBeNull();
-    expect(
-      clientAddress(headers({ "x-forwarded-for": "x".repeat(65) })),
-    ).toBeNull();
+    // An oversized one is cut, not dropped: dropping it would switch the limits off.
+    expect(clientAddress(headers({ "x-forwarded-for": "x".repeat(65) }))).toBe(
+      "x".repeat(64),
+    );
+  });
+});
+
+describe("the forecast is counted, since it costs CPU", () => {
+  it("refuses with a 429 after the limit, per user and address, and not without an address", async () => {
+    const { GET } = await import("@/app/api/lists/[listId]/forecast/route");
+    const { FORECAST_LIMIT } = await import("@/server/rate-limit");
+    const { listId } = await createListFor(world);
+    const ask = (address?: string) =>
+      callAs(
+        world.owner,
+        GET,
+        new Request(`${BASE}/api/lists/${listId}/forecast`, {
+          headers: address ? { "x-forwarded-for": address } : {},
+        }),
+        { listId },
+      );
+    const address = "198.51.100.30";
+    for (let i = 0; i < FORECAST_LIMIT.limit; i++) {
+      expect((await ask(address)).status).toBe(200);
+    }
+    const blocked = await ask(address);
+    expect(blocked.status).toBe(429);
+    expect((await blocked.json()).error.code).toBe("RATE_LIMITED");
+    expect(blocked.headers.get("retry-after")).toBeNull(); // thrown, not the write limiter's response
+    expect((await ask("198.51.100.31")).status).toBe(200);
+    expect((await ask()).status).toBe(200);
+  });
+});
+
+describe("the activity cursor", () => {
+  it("is an empty page when it is not an event of the list, not a 500", async () => {
+    const { listActivity } = await import("@/server/services/details");
+    const { listId } = await createListFor(world);
+    // Paging with real cursors is covered in history.test.ts.
+    await expect(
+      listActivity(world.owner.id, listId, {
+        limit: 5,
+        cursor: "does-not-exist",
+      }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
   });
 });
 
