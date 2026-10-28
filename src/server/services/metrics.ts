@@ -102,30 +102,40 @@ export async function getListMetrics(
 ) {
   return db.$transaction(async (tx) => {
     if (!(await readListAccess(tx, userId, listId))) throw notFound("List");
-    const stages = await tx.boardColumn.findMany({
-      where: { listId },
-      orderBy: { position: "asc" },
-      select: {
-        id: true,
-        name: true,
-        position: true,
-        category: true,
-        wipLimit: true,
-        isCommitmentPoint: true,
-      },
-    });
-    const { tasks, titles } = await loadTasks(tx, { listId }, query);
-    const metrics = computeMetrics({
-      tasks,
-      from: query.from,
-      to: query.to,
-      now,
-      ...engineOptions(startedStages(stages)),
-      bucket: (stageId, category) => stageId ?? `removed:${category}`,
-      order: stages.map((s) => s.id),
-    });
-    return { scope: "list" as const, ...metrics, stages, titles };
+    return listMetricsData(tx, listId, query, now);
   });
+}
+
+/** The same numbers without an access check, for the daily job that reads every list. */
+export async function listMetricsData(
+  tx: Tx,
+  listId: string,
+  query: MetricsQuery,
+  now: number,
+) {
+  const stages = await tx.boardColumn.findMany({
+    where: { listId },
+    orderBy: { position: "asc" },
+    select: {
+      id: true,
+      name: true,
+      position: true,
+      category: true,
+      wipLimit: true,
+      isCommitmentPoint: true,
+    },
+  });
+  const { tasks, titles } = await loadTasks(tx, { listId }, query);
+  const metrics = computeMetrics({
+    tasks,
+    from: query.from,
+    to: query.to,
+    now,
+    ...engineOptions(startedStages(stages)),
+    bucket: (stageId, category) => stageId ?? `removed:${category}`,
+    order: stages.map((s) => s.id),
+  });
+  return { scope: "list" as const, ...metrics, stages, titles };
 }
 
 /**

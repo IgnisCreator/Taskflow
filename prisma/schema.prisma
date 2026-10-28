@@ -28,6 +28,10 @@ model User {
   createdTasks  Task[]
   assignments   TaskAssignee[]
   comments      Comment[]
+  /// Wants the daily email with the open alerts (the in-app inbox is always on).
+  digestEmail   Boolean           @default(false)
+  notifications Notification[]
+  emailLogs     EmailLog[]
 
   @@unique([email])
   @@map("user")
@@ -216,20 +220,25 @@ model Folder {
 
 /// A board. Lives in a space, optionally inside one of that space's folders.
 model List {
-  id           String        @id @default(uuid())
-  spaceId      String
-  folderId     String?
-  name         String
-  description  String?
+  id               String         @id @default(uuid())
+  spaceId          String
+  folderId         String?
+  name             String
+  description      String?
   /// Bumped once by every board mutation; used for optimistic concurrency (expectedBoardVersion).
-  boardVersion Int           @default(0)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  space        Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  folder       Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  columns      BoardColumn[]
-  tasks        Task[]
-  events       TaskEvent[]
+  boardVersion     Int            @default(0)
+  /// Thresholds of the daily alerts (see src/lib/alerts.ts).
+  alertBandDays    Int            @default(3)
+  alertWipDays     Int            @default(3)
+  alertDropPercent Int            @default(50)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  space            Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  folder           Folder?        @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  columns          BoardColumn[]
+  tasks            Task[]
+  events           TaskEvent[]
+  notifications    Notification[]
 
   @@index([spaceId])
   @@index([folderId])
@@ -365,4 +374,48 @@ model TaskEvent {
 
   @@index([listId, at])
   @@index([taskId, at])
+}
+
+enum AlertKind {
+  WIP_OVER_LIMIT
+  BAND_WIDENING
+  TASK_AGING
+  THROUGHPUT_DROP
+}
+
+/// One alert for one person. `key` identifies the condition (stage, task or the list's throughput):
+/// while the condition holds there is one open row; when it stops holding the row is resolved.
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  listId     String
+  kind       AlertKind
+  key        String
+  message    String
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+  resolvedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  list       List      @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@index([userId, resolvedAt, createdAt])
+  @@index([listId, key])
+}
+
+enum EmailStatus {
+  SENT
+  FAILED
+}
+
+/// Evidence that an email was sent (or why it was not). Never holds the body.
+model EmailLog {
+  id        String      @id @default(uuid())
+  userId    String
+  subject   String
+  status    EmailStatus
+  error     String?
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
