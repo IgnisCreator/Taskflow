@@ -1,5 +1,6 @@
 import { createWorkspaceSchema } from "@/lib/validations/workspaces";
 import {
+  assertNotDemo,
   assertSameOrigin,
   handle,
   json,
@@ -16,6 +17,7 @@ export const GET = handle(async () => {
 export const POST = handle(async (request: Request) => {
   assertSameOrigin(request);
   const user = await requireUser();
+  assertNotDemo(user);
   const { name } = await readJson(request, createWorkspaceSchema);
   return json(await createWorkspace(user.id, name), 201);
 });

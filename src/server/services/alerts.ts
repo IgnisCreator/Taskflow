@@ -46,6 +46,7 @@ const loadLists = () =>
           isPrivate: true,
           workspaceId: true,
           members: { select: { userId: true } },
+          workspace: { select: { isDemo: true } },
         },
       },
     },
@@ -81,7 +82,14 @@ async function reconcile(tx: Tx, list: ListToCheck, now: number) {
     where: { taskId: { in: alerts.flatMap((a) => a.taskId ?? []) } },
     select: { taskId: true, userId: true },
   });
-  const recipients = (alert: Alert) => {
+  // In the public demo the read-only visitor (a guest) also sees every alert of the sample lists.
+  const visitors = list.space.workspace.isDemo
+    ? members.filter((m) => m.role === "GUEST").map((m) => m.userId)
+    : [];
+  const recipients = (alert: Alert) => [
+    ...new Set([...intended(alert), ...visitors]),
+  ];
+  const intended = (alert: Alert) => {
     if (!alert.taskId) return admins.map((m) => m.userId);
     const own = assignees
       .filter(

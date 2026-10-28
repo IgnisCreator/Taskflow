@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { ApiError, handle, json } from "@/server/http";
 import { runAlerts } from "@/server/services/alerts";
+import { demoEnabled, regenerateDemo } from "@/server/services/demo";
 import { sendDigests } from "@/server/services/digest";
 
 /**
@@ -16,7 +17,14 @@ export const GET = handle(async (request: Request) => {
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) {
     throw new ApiError(401, "UNAUTHORIZED", "Bad cron secret");
   }
+  // The demo first, so its alerts are computed on fresh data; a failure there must not stop the rest.
+  const demo = demoEnabled()
+    ? await regenerateDemo().catch((error: Error) => {
+        console.error("Demo regeneration failed:", error.name);
+        return { failed: true as const };
+      })
+    : null;
   const alerts = await runAlerts();
   const digests = await sendDigests();
-  return json({ alerts, digests });
+  return json({ demo, alerts, digests });
 });

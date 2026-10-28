@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { startDemo } from "@/app/demo-actions";
+import { demoEnabled } from "@/server/services/demo";
 import { getCurrentUser } from "@/server/session";
 
 const FEATURES = [
@@ -70,6 +72,16 @@ export default async function HomePage() {
           <Link href={cta.href} className="btn px-5 py-3 text-base">
             {cta.label}
           </Link>
+          {!user && demoEnabled() && (
+            <form action={startDemo}>
+              <button
+                type="submit"
+                className="btn-secondary px-5 py-3 text-base"
+              >
+                Explore the demo
+              </button>
+            </form>
+          )}
           <a href="#kanban" className="btn-secondary px-5 py-3 text-base">
             What is Kanban?
           </a>

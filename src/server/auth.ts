@@ -1,12 +1,31 @@
 import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { getEnv } from "@/lib/env";
 import { db } from "@/server/db";
 import { sendEmail } from "@/server/email";
 
 const env = getEnv();
+
+/** Auth endpoints that change an account: refused to the demo visitor. */
+const ACCOUNT_CHANGES = new Set([
+  "/change-password",
+  "/change-email",
+  "/update-user",
+  "/delete-user",
+  "/set-password",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  "/link-social",
+  "/unlink-account",
+]);
 
 export const auth = betterAuth({
   baseURL: env.APP_URL,
@@ -40,7 +59,24 @@ The link works for one hour. If you did not create an account, ignore this messa
     additionalFields: {
       // Asked at sign-up and editable in the profile; the in-app inbox does not depend on it.
       digestEmail: { type: "boolean", required: false, defaultValue: false },
+      // Set by the server for the demo accounts, never by a sign-up form.
+      isDemo: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
     },
+  },
+  hooks: {
+    // The demo visitor is a shared account: it cannot change the password, the email or anything else.
+    before: createAuthMiddleware(async (ctx) => {
+      if (!ACCOUNT_CHANGES.has(ctx.path)) return;
+      const session = await getSessionFromCtx(ctx);
+      if ((session?.user as { isDemo?: boolean } | undefined)?.isDemo) {
+        throw new APIError("FORBIDDEN", { message: "The demo is read-only" });
+      }
+    }),
   },
   socialProviders: {
     github: {
