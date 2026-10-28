@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
     <main className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Notifications</h1>
-        {open.some((n) => !n.readAt) && (
+        {!user.isDemo && open.some((n) => !n.readAt) && (
           <ApiForm
             method="POST"
             url="/api/notifications/read"
@@ -50,7 +50,7 @@ export default async function NotificationsPage() {
               <span>{when(n.createdAt)}</span>
               {n.readAt ? (
                 <span>Read</span>
-              ) : (
+              ) : user.isDemo ? null : (
                 <ApiForm
                   method="POST"
                   url="/api/notifications/read"

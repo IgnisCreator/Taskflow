@@ -91,6 +91,16 @@ export async function listActivity(
 ) {
   return db.$transaction(async (tx) => {
     if (!(await readListAccess(tx, userId, listId))) throw notFound("List");
+    // A cursor that is not an event of this list (made up, or its task is gone) is an empty page.
+    if (
+      cursor &&
+      !(await tx.taskEvent.findFirst({
+        where: { id: cursor, listId },
+        select: { id: true },
+      }))
+    ) {
+      return { items: [], nextCursor: null };
+    }
     const rows = await tx.taskEvent.findMany({
       where: { listId },
       orderBy: [{ at: "desc" }, { id: "desc" }],

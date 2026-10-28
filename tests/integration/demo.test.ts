@@ -315,13 +315,26 @@ describe("what the visitor can do", () => {
     expect(res.status).toBe(200);
   });
 
-  it("can still mark its own alerts as read", async () => {
+  it("cannot mark the alerts as read: it is one account shared by every visitor", async () => {
     const res = await callAs(
       visitor,
       readRoute.POST,
       req("POST", "/api/notifications/read", {}),
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("DEMO_READ_ONLY");
+  });
+
+  it("cannot list the sessions of the shared account, which are the other visitors'", async () => {
+    const headers = new Headers({ cookie: visitor.cookie });
+    await expect(auth.api.listSessions({ headers })).rejects.toThrow(
+      /read-only/,
+    );
+    // A normal user still sees their own (control).
+    const own = new Headers({ cookie: world.member.cookie });
+    await expect(
+      auth.api.listSessions({ headers: own }),
+    ).resolves.toBeDefined();
   });
 });
 
@@ -398,5 +411,33 @@ describe("turning it on and off", () => {
     expect(on.demo.workspaceId).not.toBe(before.id);
     expect(on.alerts.failed).toBe(0);
     delete process.env.DEMO_ENABLED;
+  });
+});
+
+describe("the demo visitor is nobody's member", () => {
+  it("is refused as a member of a real workspace, like an unknown email", async () => {
+    const { addMember } = await import("@/server/services/members");
+    const { workspaceId } = await createListFor(world);
+    await expect(
+      addMember(world.owner.id, workspaceId, {
+        email: demo.DEMO_VISITOR_EMAIL,
+        role: "MEMBER",
+      }),
+    ).rejects.toMatchObject({ status: 404, code: "USER_NOT_FOUND" });
+    const visitor = await db.user.findUniqueOrThrow({
+      where: { email: demo.DEMO_VISITOR_EMAIL },
+    });
+    expect(
+      await db.workspaceMember.count({
+        where: { workspaceId, userId: visitor.id },
+      }),
+    ).toBe(0);
+    // A real user is still added (control).
+    await expect(
+      addMember(world.owner.id, workspaceId, {
+        email: world.candidate.email,
+        role: "MEMBER",
+      }),
+    ).resolves.toBeDefined();
   });
 });

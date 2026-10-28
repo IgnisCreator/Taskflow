@@ -6,6 +6,8 @@ export type Limit = { limit: number; windowSeconds: number };
 export const WRITE_LIMIT: Limit = { limit: 120, windowSeconds: 60 };
 /** Entries to the public demo, per client address. */
 export const DEMO_LIMIT: Limit = { limit: 20, windowSeconds: 3600 };
+/** Forecasts, the one read that costs real CPU (up to 10,000 runs a request), per user and address. */
+export const FORECAST_LIMIT: Limit = { limit: 30, windowSeconds: 60 };
 
 /**
  * Counts one more hit on `key` in the current fixed window and says whether it is still within the
@@ -38,7 +40,8 @@ export async function rateLimit(
 export function clientAddress(headers: Headers): string | null {
   const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const address = forwarded || headers.get("x-real-ip")?.trim();
-  return address && address.length <= 64 ? address : null;
+  // An oversized value is cut, not dropped: "no address" means "not counted".
+  return address ? address.slice(0, 64) : null;
 }
 
 /** Deletes the counters that are no longer needed (ours and Better Auth's, older than a day). */

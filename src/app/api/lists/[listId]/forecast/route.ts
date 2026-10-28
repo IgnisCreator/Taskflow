@@ -1,5 +1,5 @@
 import { parseForecastQuery } from "@/lib/validations/forecast";
-import { handle, json, requireUser } from "@/server/http";
+import { handle, json, limitForecast, requireUser } from "@/server/http";
 import { getListForecast } from "@/server/services/forecast";
 
 type Context = { params: Promise<{ listId: string }> };
@@ -7,6 +7,7 @@ type Context = { params: Promise<{ listId: string }> };
 /** A Monte Carlo forecast from the list's history: when `items` are done, or how many by `date`. */
 export const GET = handle(async (request: Request, { params }: Context) => {
   const user = await requireUser();
+  await limitForecast(user.id, request.headers);
   const query = parseForecastQuery(
     Object.fromEntries(new URL(request.url).searchParams),
     Date.now(),

@@ -1,7 +1,12 @@
 import "server-only";
 import { z, ZodError } from "zod";
 import { getEnv } from "@/lib/env";
-import { WRITE_LIMIT, clientAddress, rateLimit } from "@/server/rate-limit";
+import {
+  FORECAST_LIMIT,
+  WRITE_LIMIT,
+  clientAddress,
+  rateLimit,
+} from "@/server/rate-limit";
 import { getCurrentUser } from "@/server/session";
 
 /** A failure with a stable code that route handlers turn into `{ error: { code, message, requestId } }`. */
@@ -56,6 +61,23 @@ async function limitWrites(request: unknown): Promise<Response | null> {
   );
   response.headers.set("Retry-After", String(retryAfter));
   return response;
+}
+
+/** The forecast costs real CPU, so it is counted like a write (and, like one, only with an address). */
+export async function limitForecast(userId: string, headers: Headers) {
+  const address = clientAddress(headers);
+  if (!address) return;
+  const { ok, retryAfter } = await rateLimit(
+    `forecast:${userId}:${address}`,
+    FORECAST_LIMIT,
+  );
+  if (!ok) {
+    throw new ApiError(
+      429,
+      "RATE_LIMITED",
+      `Too many forecasts. Try again in ${retryAfter} seconds.`,
+    );
+  }
 }
 
 /** Wraps a route handler: known failures keep their code; anything else is logged without payloads. */
