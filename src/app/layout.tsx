@@ -82,7 +82,7 @@ export default async function RootLayout({
             </Link>
           </p>
         )}
-        <div id="content" className="mx-auto max-w-[90rem] px-4 py-8">
+        <div id="content" className="mx-auto max-w-[90rem] px-4 py-6">
           {children}
         </div>
       </body>

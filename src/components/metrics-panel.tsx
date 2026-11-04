@@ -116,23 +116,20 @@ export function MetricsPanel({
         <button type="submit" className="btn">
           Apply
         </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">Last (UTC days)</span>
+          {PRESETS.map((n) => (
+            <Link key={n} href={preset(n)} className="btn-secondary">
+              {n} days
+            </Link>
+          ))}
+          {forecastHref && (
+            <Link href={forecastHref} className="btn-secondary">
+              Open the forecast
+            </Link>
+          )}
+        </div>
       </form>
-      <p className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">Last</span>
-        {PRESETS.map((n) => (
-          <Link key={n} href={preset(n)} className="btn-secondary">
-            {n} days
-          </Link>
-        ))}
-        <span className="text-muted">
-          Showing {metrics.range.from} to {metrics.range.to} (UTC days).
-        </span>
-        {forecastHref && (
-          <Link href={forecastHref} className="btn-secondary ml-auto">
-            Open the forecast
-          </Link>
-        )}
-      </p>
       <KeyFigures metrics={metrics} />
       <div id="dashboard" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <CfdChart metrics={metrics} />
@@ -159,9 +156,9 @@ function KeyFigures({ metrics }: { metrics: PanelMetrics }) {
   return (
     <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {figures.map(([label, value]) => (
-        <div key={label} className="card px-4 py-3">
+        <div key={label} className="card px-4 py-2">
           <dt className="text-sm text-muted">{label}</dt>
-          <dd className="text-2xl font-semibold">{value}</dd>
+          <dd className="text-xl font-semibold">{value}</dd>
         </div>
       ))}
     </dl>
