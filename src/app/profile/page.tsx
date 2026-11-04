@@ -9,8 +9,9 @@ export default async function ProfilePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const digest = await getDigestPreference(user.id);
-  // The demo visitor shares one account: it has a password but nobody may change it.
-  const canChangePassword = !user.isDemo && (await hasPassword(user.id));
+  // A demo sandbox has a password nobody knows and nobody may change.
+  const canChangePassword =
+    !user.isDemo && !user.sandboxUntil && (await hasPassword(user.id));
 
   return (
     <main className="space-y-6">

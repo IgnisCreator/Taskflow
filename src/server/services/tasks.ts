@@ -18,6 +18,7 @@ import {
   withListLock,
 } from "@/server/locks";
 import { can, canSeeSpace } from "@/server/policies";
+import { sandboxRoom } from "@/server/sandbox";
 import { getList } from "@/server/services/lists";
 
 const taskSelect = {
@@ -244,6 +245,7 @@ export async function createTask(
       expectedBoardVersion,
       "task:write",
       async (tx, actor) => {
+        await sandboxRoom(tx, actor.workspaceId, "tasks");
         const column = await tx.boardColumn.findFirst({
           where: { id: input.columnId, listId },
           select: { id: true, category: true },

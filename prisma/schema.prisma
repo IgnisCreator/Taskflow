@@ -30,12 +30,15 @@ model User {
   comments      Comment[]
   /// Wants the daily email with the open alerts (the in-app inbox is always on).
   digestEmail   Boolean           @default(false)
-  /// The visitor of the public demo and its made-up teammates: read-only, never a real person.
+  /// The made-up teammates of the public demo: never a real person, they cannot sign in.
   isDemo        Boolean           @default(false)
+  /// Set only for the temporary visitor of the public demo: when its sandbox (the user and its workspace) is deleted.
+  sandboxUntil  DateTime?
   notifications Notification[]
   emailLogs     EmailLog[]
 
   @@unique([email])
+  @@index([sandboxUntil])
   @@map("user")
 }
 
@@ -124,8 +127,6 @@ model Workspace {
   templates  WorkflowTemplate[]
   types      WorkItemType[]
   labels     Label[]
-  /// The sample workspace of the public demo: the only one the daily regeneration may delete.
-  isDemo     Boolean            @default(false)
 }
 
 /// What kind of work a task is (Task, Bug, Request...). Chosen by the workspace; metrics can be split by it.

@@ -57,7 +57,9 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ demo?: string }>;
 }) {
-  const limited = (await searchParams).demo === "limit";
+  const demo = (await searchParams).demo;
+  const limited = demo === "limit";
+  const busy = demo === "busy";
   const user = await getCurrentUser();
   const cta = user
     ? { href: "/workspaces", label: "Go to your workspaces" }
@@ -87,6 +89,11 @@ export default async function HomePage({
               later.
             </span>
           )}
+          {busy && (
+            <span role="alert" className="error w-full">
+              The demo is full right now. Try again in a little while.
+            </span>
+          )}
           {!user && demoEnabled() && (
             <form action={startDemo}>
               <button
@@ -101,6 +108,12 @@ export default async function HomePage({
             What is Kanban?
           </a>
         </p>
+        {!user && demoEnabled() && (
+          <p className="text-sm text-muted">
+            The demo opens your own sandbox with made-up data. You can change
+            anything in it; it is deleted after 24 hours.
+          </p>
+        )}
       </section>
 
       <section id="kanban" className="scroll-mt-8 space-y-8">

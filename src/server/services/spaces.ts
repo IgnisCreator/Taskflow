@@ -10,6 +10,7 @@ import {
 } from "@/server/locks";
 
 import { canSeeSpace } from "@/server/policies";
+import { sandboxRoom } from "@/server/sandbox";
 import { assertTemplate } from "@/server/services/templates";
 
 const spaceSelect = {
@@ -101,11 +102,17 @@ export async function createSpace(
   workspaceId: string,
   input: { name: string; isPrivate: boolean },
 ) {
-  return withWorkspaceLock(userId, workspaceId, "structure:manage", (tx) =>
-    tx.space.create({
-      data: { ...input, workspaceId },
-      select: spaceSelect,
-    }),
+  return withWorkspaceLock(
+    userId,
+    workspaceId,
+    "structure:manage",
+    async (tx) => {
+      await sandboxRoom(tx, workspaceId, "spaces");
+      return tx.space.create({
+        data: { ...input, workspaceId },
+        select: spaceSelect,
+      });
+    },
   );
 }
 

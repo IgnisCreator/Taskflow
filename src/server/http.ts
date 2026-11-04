@@ -122,10 +122,17 @@ export function assertSameOrigin(request: Request) {
   }
 }
 
-/** The demo visitor only looks: the few writes open to any signed-in user refuse them. */
-export function assertNotDemo(user: { isDemo: boolean }) {
-  if (user.isDemo) {
-    throw new ApiError(403, "DEMO_READ_ONLY", "The demo is read-only");
+/** A demo sandbox owns its workspace and nothing else: the few writes open to any signed-in user refuse it. */
+export function assertNotDemo(user: {
+  isDemo: boolean;
+  sandboxUntil: Date | null;
+}) {
+  if (user.isDemo || user.sandboxUntil) {
+    throw new ApiError(
+      403,
+      "DEMO_RESTRICTED",
+      "This is not available in the demo",
+    );
   }
 }
 

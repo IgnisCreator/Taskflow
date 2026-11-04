@@ -55,12 +55,24 @@ export async function addMember(
     "member:manage", // coarse gate; canManageMember below decides per role
     async (tx, actor) => {
       if (!canManageMember(actor, { to: input.role })) throw forbidden();
+      // A demo sandbox cannot look people up by email: the answer would tell which real addresses exist.
+      const inviter = await tx.user.findUnique({
+        where: { id: userId },
+        select: { sandboxUntil: true },
+      });
+      if (inviter?.sandboxUntil) {
+        throw new ApiError(
+          403,
+          "DEMO_RESTRICTED",
+          "This is not available in the demo",
+        );
+      }
       const target = await tx.user.findFirst({
         where: { email: { equals: input.email, mode: "insensitive" } },
-        select: { id: true, isDemo: true },
+        select: { id: true, isDemo: true, sandboxUntil: true },
       });
-      // The shared demo visitor is never somebody's member: every visitor would write there.
-      if (!target || target.isDemo) {
+      // Demo accounts (the made-up teammates, a visitor's sandbox) are never somebody's member in a real workspace.
+      if (!target || target.isDemo || target.sandboxUntil) {
         throw new ApiError(404, "USER_NOT_FOUND", "No user has that email");
       }
       const members = await tx.workspaceMember.findMany({

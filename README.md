@@ -14,7 +14,7 @@ It is a portfolio project: a demo, not a product. It runs entirely on free tiers
 - **Flow metrics.** Per list or per space: cycle time and lead time with percentiles, throughput, WIP, aging, and a cumulative flow diagram. Every chart comes with a sentence stating what it shows, the data table behind it, and an explanation citing its source.
 - **Alerts.** WIP over its limit for several days, a widening cycle-time band, a task older than the 85th percentile, a drop in throughput. In-app notifications, plus an opt-in daily email.
 - **Forecast.** "When will it be done?" and "How many by this date?" answered by a seeded Monte Carlo simulation of your own history (10,000 runs). The seed and the history window are always shown, so a result can be reproduced.
-- **Public demo.** "Explore the demo" signs a read-only visitor into a sample workspace made from a seeded 180-day simulation with a bottleneck in code review. A daily job renews it.
+- **Public demo.** "Explore the demo" gives every visitor a private sandbox for 24 hours: their own copy of a sample workspace (a seeded 180-day simulation with a bottleneck in code review, and a made-up team with every role), where they can move tasks, edit and configure everything. It is deleted after 24 hours, or when they leave.
 
 ## Architecture
 
@@ -50,11 +50,11 @@ Pages and route handlers call services; services own permission checks, locking 
 The detailed decision records are kept outside the repository; the ones that shape the code:
 
 - **Append-only `TaskEvent`.** Every move, assignment and edit is an event; metrics are computed from events, never from the task's current state, so they stay correct when a workflow is edited.
-- **PostgreSQL does the coordination.** Per-list and per-workspace advisory locks serialize concurrent edits; the alerts job and the demo regeneration take an advisory lock too; rate limits are rows in the database. No Redis, nothing else to host.
+- **PostgreSQL does the coordination.** Per-list and per-workspace advisory locks serialize concurrent edits; the alerts job takes an advisory lock too; rate limits are rows in the database. No Redis, nothing else to host.
 - **Pure engines, tested hard.** Percentiles are nearest-rank, days are UTC, the forecast uses a seeded generator (mulberry32) so tests assert exact numbers.
 - **Better Auth** for sessions, with email and password. GitHub login exists for development only.
 - **Closed by default.** Production runs with no public sign-up and no GitHub login; accounts are created by script (`npm run user:create`). `OPEN_ACCESS=1` opens the doors for development and tests.
-- **A demo that cannot hurt.** The visitor is a `GUEST` with a derived password, account-changing endpoints refuse demo sessions, and regeneration deletes only the workspace flagged `isDemo`.
+- **A demo that cannot hurt.** Each visitor is a temporary user (a password derived from the server secret, a deadline in `sandboxUntil`) who owns one workspace and nothing else. The deadline is enforced on every request, not only by the daily purge; account changes, inviting people by email and a second workspace are refused; each sandbox has caps (tasks, comments, lists, spaces) and the number of live sandboxes is capped. The purge deletes only users that have a deadline, and the workspaces they own.
 - **Basic security headers, no strict CSP yet.** A strict Content-Security-Policy needs per-request nonces; it is recorded as debt rather than shipped half-working.
 - **Design tokens.** Tailwind with semantic colour tokens; a source guard rejects raw colours.
 
@@ -88,7 +88,7 @@ USER_PASSWORD='a-long-password' npm run user:create -- --email you@example.com -
 
 ### The demo locally
 
-Set `DEMO_ENABLED=1` and `CRON_SECRET=<random>` in `.env`, run `npm run alerts:run` once (it builds the sample workspace), and use "Explore the demo" on the landing page.
+Set `DEMO_ENABLED=1` in `.env` and use "Explore the demo" on the landing page. Each visit builds a new sandbox. To delete the expired ones, set `CRON_SECRET=<random>` and run `npm run alerts:run`.
 
 ## Environment variables
 
@@ -101,7 +101,7 @@ Set `DEMO_ENABLED=1` and `CRON_SECRET=<random>` in `.env`, run `npm run alerts:r
 | `OPEN_ACCESS`                          | development           | `1` opens sign-up and GitHub login. Leave unset in production                              |
 | `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET` | development, optional | GitHub login; set both or neither                                                          |
 | `CRON_SECRET`                          | production            | Bearer secret of the daily job. Without it `/api/cron/alerts` answers 503 and does nothing |
-| `DEMO_ENABLED`                         | optional              | `1` shows "Explore the demo" and lets the daily job renew the sample workspace             |
+| `DEMO_ENABLED`                         | optional              | `1` shows "Explore the demo", which opens a 24-hour sandbox for each visitor               |
 | `RESEND_API_KEY`, `EMAIL_FROM`         | optional              | Email delivery. Without a key, links and digests are logged to the server console          |
 
 ## Deployment (Vercel + Neon + Resend)
@@ -115,7 +115,7 @@ Everything below is free-tier. Nothing here needs a credit card except, optional
    ```bash
    DATABASE_URL='<direct url>' USER_PASSWORD='<long password>' npm run user:create -- --email you@example.com --name You
    ```
-5. **Check it.** `GET /api/health` should answer `{"status":"ok"}`. Trigger the daily job once so the demo exists: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/alerts`.
+5. **Check it.** `GET /api/health` should answer `{"status":"ok"}`. The daily job deletes the demo sandboxes past their 24 hours and checks the alerts; you can trigger it by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/alerts`.
 6. **Email (optional).** Resend's free plan only delivers to other addresses from a domain you have verified. Add `RESEND_API_KEY` and `EMAIL_FROM` once you have one; until then the daily digest and verification links are only logged.
 
 Hobby plans run cron jobs once a day, which is all the app needs.

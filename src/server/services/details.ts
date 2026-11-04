@@ -10,6 +10,7 @@ import {
   type Tx,
 } from "@/server/locks";
 import { can } from "@/server/policies";
+import { sandboxRoom } from "@/server/sandbox";
 
 const missing = () => notFound("Task");
 
@@ -189,8 +190,9 @@ export async function createComment(
   taskId: string,
   body: string,
 ) {
-  return withListAccess(userId, listId, "task:write", async (tx) => {
+  return withListAccess(userId, listId, "task:write", async (tx, actor) => {
     await assertTask(tx, listId, taskId);
+    await sandboxRoom(tx, actor.workspaceId, "comments");
     return tx.comment.create({
       data: { taskId, authorId: userId, body },
       select: {
