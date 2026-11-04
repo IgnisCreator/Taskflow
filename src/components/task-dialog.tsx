@@ -321,7 +321,12 @@ export function TaskDialog({
                 {state.mode === "create" ? "Create task" : "Save"}
               </button>
             )}
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            {/* Read-only, Close is the only action, so it is the primary button. */}
+            <button
+              type="button"
+              className={canWrite ? "btn-secondary" : "btn"}
+              onClick={onClose}
+            >
               {canWrite ? "Cancel" : "Close"}
             </button>
             {canWrite && task && (

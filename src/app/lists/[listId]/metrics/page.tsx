@@ -42,6 +42,7 @@ export default async function ListMetricsPage({
         <MetricsPanel
           metrics={metrics}
           basePath={`/lists/${list.id}/metrics`}
+          forecastHref={`/lists/${list.id}/forecast`}
           now={now}
           error={error}
           filter={query}

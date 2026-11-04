@@ -193,7 +193,8 @@ export function Board({
         {filtered && shown.every((column) => column.tasks.length === 0) && (
           <p className="notice">{messages.board.noMatches}</p>
         )}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* One row of columns that share the width and scroll sideways past ~4, so the line of the flow never wraps. */}
+        <div className="grid auto-cols-[minmax(17rem,1fr)] grid-flow-col gap-4 overflow-x-auto pb-3">
           {shown.map((column) => (
             <BoardColumn
               key={column.id}
