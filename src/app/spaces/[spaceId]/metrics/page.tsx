@@ -36,7 +36,7 @@ export default async function SpaceMetricsPage({
 
   return (
     <WorkspaceShell workspace={workspace}>
-      <main className="space-y-6">
+      <main className="space-y-4">
         <p className="text-sm">
           <Link href={`/w/${workspaceId}`} className="link">
             &larr; {workspace.name}

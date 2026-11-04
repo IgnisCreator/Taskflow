@@ -34,7 +34,7 @@ export default async function RootLayout({
         <header className="sticky top-0 z-10 border-b border-line bg-surface">
           <nav
             aria-label="Main"
-            className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm sm:gap-x-6"
+            className="mx-auto flex max-w-[90rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm sm:gap-x-6"
           >
             <Link href="/" className="text-base font-semibold text-link">
               TaskFlow
@@ -82,7 +82,7 @@ export default async function RootLayout({
             </Link>
           </p>
         )}
-        <div id="content" className="mx-auto max-w-6xl px-4 py-8">
+        <div id="content" className="mx-auto max-w-[90rem] px-4 py-6">
           {children}
         </div>
       </body>

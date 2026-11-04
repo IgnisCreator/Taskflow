@@ -25,7 +25,9 @@ export function MetricsPanel({
   filter,
   types,
   members,
+  forecastHref,
 }: {
+  forecastHref?: string;
   metrics: PanelMetrics;
   basePath: string;
   now: number;
@@ -47,7 +49,7 @@ export function MetricsPanel({
     return `${basePath}?${params}`;
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {error && (
         <p role="alert" className="card-danger text-danger-text">
           {error}. Showing the last 30 days instead.
@@ -57,7 +59,7 @@ export function MetricsPanel({
         method="get"
         action={basePath}
         aria-label="Range and filters"
-        className="card flex flex-wrap items-end gap-3"
+        className="card flex flex-wrap items-end gap-3 p-3"
       >
         <label className="field">
           From
@@ -114,24 +116,51 @@ export function MetricsPanel({
         <button type="submit" className="btn">
           Apply
         </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">Last (UTC days)</span>
+          {PRESETS.map((n) => (
+            <Link key={n} href={preset(n)} className="btn-secondary">
+              {n} days
+            </Link>
+          ))}
+          {forecastHref && (
+            <Link href={forecastHref} className="btn-secondary">
+              Open the forecast
+            </Link>
+          )}
+        </div>
       </form>
-      <p className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">Last</span>
-        {PRESETS.map((n) => (
-          <Link key={n} href={preset(n)} className="btn-secondary">
-            {n} days
-          </Link>
-        ))}
-        <span className="text-muted">
-          Showing {metrics.range.from} to {metrics.range.to} (UTC days).
-        </span>
-      </p>
-      <CfdChart metrics={metrics} />
-      <CycleTimeChart metrics={metrics} />
-      <AgingChart metrics={metrics} />
-      <ThroughputChart metrics={metrics} />
-      <WipPanel metrics={metrics} />
-      <EfficiencyCard metrics={metrics} />
+      <KeyFigures metrics={metrics} />
+      <div id="dashboard" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <CfdChart metrics={metrics} />
+        <CycleTimeChart metrics={metrics} />
+        <AgingChart metrics={metrics} />
+        <ThroughputChart metrics={metrics} />
+        <WipPanel metrics={metrics} />
+        <EfficiencyCard metrics={metrics} />
+      </div>
     </div>
+  );
+}
+
+/** The four numbers to read first; each one repeats what its chart below says in full. */
+function KeyFigures({ metrics }: { metrics: PanelMetrics }) {
+  const { cycleTime: c, age } = metrics;
+  const older = c.p85 === null ? null : age.filter((a) => a.days > c.p85!);
+  const figures: [string, string][] = [
+    ["Median cycle time", c.p50 === null ? "–" : `${c.p50.toFixed(1)} days`],
+    ["Finished", String(metrics.throughput.total)],
+    ["In progress now", String(metrics.wip.total)],
+    ["Older than 85% of finished", older === null ? "–" : String(older.length)],
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {figures.map(([label, value]) => (
+        <div key={label} className="card px-4 py-2">
+          <dt className="text-sm text-muted">{label}</dt>
+          <dd className="text-xl font-semibold">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

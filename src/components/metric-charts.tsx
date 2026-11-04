@@ -19,8 +19,9 @@ export type PanelMetrics = Metrics & {
   titles: Record<string, string>;
 };
 
-export const W = 640;
-export const H = 260;
+// Small enough that the labels stay readable when three charts share a row (see MetricsPanel).
+export const W = 480;
+export const H = 180;
 export const M = { l: 40, r: 12, t: 12, b: 28 };
 export const PLOT_W = W - M.l - M.r;
 export const PLOT_H = H - M.t - M.b;
@@ -64,7 +65,7 @@ export function Svg({
       viewBox={`0 0 ${W} ${H}`}
       role="img"
       aria-label={label}
-      className="h-auto w-full"
+      className="h-auto w-full group-target:mx-auto group-target:max-w-3xl"
     >
       {ticks.map((tick) => (
         <g key={tick}>
@@ -80,7 +81,7 @@ export function Svg({
             y={y(tick)}
             textAnchor="end"
             dominantBaseline="middle"
-            className="fill-muted text-[10px]"
+            className="fill-muted text-[12px]"
           >
             {tick}
           </text>
@@ -92,7 +93,7 @@ export function Svg({
           x={l.x}
           y={H - 8}
           textAnchor={l.anchor ?? "middle"}
-          className="fill-muted text-[10px]"
+          className="fill-muted text-[12px]"
         >
           {l.text}
         </text>
@@ -157,49 +158,68 @@ export function ChartCard({
 }) {
   const help = METRIC_HELP[metric];
   return (
+    // `Expand` is a plain link to this card's id: the :target styles widen it to the whole row.
     <section
+      id={`card-${metric}`}
       aria-labelledby={`m-${metric}`}
       data-metric={metric}
-      className="card space-y-3"
+      className="card group space-y-2 p-4 target:col-span-full"
     >
-      <h2 id={`m-${metric}`} className="text-lg font-semibold">
-        {help.title}
-      </h2>
-      <p>{summary}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 id={`m-${metric}`} className="text-base font-semibold">
+          {help.title}
+        </h2>
+        <a
+          href={`#card-${metric}`}
+          className="link text-sm group-target:hidden"
+        >
+          Expand<span className="sr-only"> {help.title}</span>
+        </a>
+        <a
+          href="#dashboard"
+          className="link hidden text-sm group-target:inline"
+        >
+          Back to the dashboard
+        </a>
+      </div>
+      <p className="text-sm">{summary}</p>
       {children}
-      {data}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-link">
-          What is this and how to read it
-        </summary>
-        <dl className="mt-2 space-y-2">
-          <div>
-            <dt className="font-semibold">What it is</dt>
-            <dd className="text-muted">{help.what}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Why it matters</dt>
-            <dd className="text-muted">{help.why}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">How to read it</dt>
-            <dd className="text-muted">{help.read}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Source</dt>
-            <dd>
-              <a
-                href={help.source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link"
-              >
-                {help.source.label}
-              </a>
-            </dd>
-          </div>
-        </dl>
-      </details>
+      {/* The two folds sit side by side to save height; an open one takes the whole row. */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-1 [&>details[open]]:basis-full">
+        {data}
+        <details className="text-sm">
+          <summary className="cursor-pointer text-link">
+            What is this and how to read it
+          </summary>
+          <dl className="mt-2 space-y-2">
+            <div>
+              <dt className="font-semibold">What it is</dt>
+              <dd className="text-muted">{help.what}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Why it matters</dt>
+              <dd className="text-muted">{help.why}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">How to read it</dt>
+              <dd className="text-muted">{help.read}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Source</dt>
+              <dd>
+                <a
+                  href={help.source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  {help.source.label}
+                </a>
+              </dd>
+            </div>
+          </dl>
+        </details>
+      </div>
     </section>
   );
 }
@@ -304,7 +324,7 @@ export function Line({
         x={W - M.r - 2}
         y={y - 3}
         textAnchor="end"
-        className="fill-fg text-[10px]"
+        className="fill-fg text-[12px]"
       >
         {text}
       </text>
@@ -430,7 +450,7 @@ export function AgingChart({ metrics }: { metrics: PanelMetrics }) {
         y={y}
         xLabels={buckets.map((b, i) => ({
           x: M.l + slot * (i + 0.5),
-          text: bucketName(metrics, b).slice(0, 14),
+          text: bucketName(metrics, b).slice(0, 10),
         }))}
       >
         {buckets.map((bucket, i) =>

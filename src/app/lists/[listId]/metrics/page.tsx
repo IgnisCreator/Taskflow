@@ -32,7 +32,7 @@ export default async function ListMetricsPage({
 
   return (
     <WorkspaceShell workspace={workspace} currentListId={list.id}>
-      <main className="space-y-6">
+      <main className="space-y-4">
         <p className="text-sm">
           <Link href={`/lists/${list.id}`} className="link">
             &larr; {list.name}
@@ -42,6 +42,7 @@ export default async function ListMetricsPage({
         <MetricsPanel
           metrics={metrics}
           basePath={`/lists/${list.id}/metrics`}
+          forecastHref={`/lists/${list.id}/forecast`}
           now={now}
           error={error}
           filter={query}
