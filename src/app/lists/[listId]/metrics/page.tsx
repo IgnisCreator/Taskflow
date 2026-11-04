@@ -32,7 +32,7 @@ export default async function ListMetricsPage({
 
   return (
     <WorkspaceShell workspace={workspace} currentListId={list.id}>
-      <main className="space-y-6">
+      <main className="space-y-4">
         <p className="text-sm">
           <Link href={`/lists/${list.id}`} className="link">
             &larr; {list.name}

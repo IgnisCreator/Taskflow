@@ -21,7 +21,7 @@ export type PanelMetrics = Metrics & {
 
 // Small enough that the labels stay readable when three charts share a row (see MetricsPanel).
 export const W = 480;
-export const H = 220;
+export const H = 180;
 export const M = { l: 40, r: 12, t: 12, b: 28 };
 export const PLOT_W = W - M.l - M.r;
 export const PLOT_H = H - M.t - M.b;
@@ -184,39 +184,42 @@ export function ChartCard({
       </div>
       <p className="text-sm">{summary}</p>
       {children}
-      {data}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-link">
-          What is this and how to read it
-        </summary>
-        <dl className="mt-2 space-y-2">
-          <div>
-            <dt className="font-semibold">What it is</dt>
-            <dd className="text-muted">{help.what}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Why it matters</dt>
-            <dd className="text-muted">{help.why}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">How to read it</dt>
-            <dd className="text-muted">{help.read}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Source</dt>
-            <dd>
-              <a
-                href={help.source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="link"
-              >
-                {help.source.label}
-              </a>
-            </dd>
-          </div>
-        </dl>
-      </details>
+      {/* The two folds sit side by side to save height; an open one takes the whole row. */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-1 [&>details[open]]:basis-full">
+        {data}
+        <details className="text-sm">
+          <summary className="cursor-pointer text-link">
+            What is this and how to read it
+          </summary>
+          <dl className="mt-2 space-y-2">
+            <div>
+              <dt className="font-semibold">What it is</dt>
+              <dd className="text-muted">{help.what}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Why it matters</dt>
+              <dd className="text-muted">{help.why}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">How to read it</dt>
+              <dd className="text-muted">{help.read}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold">Source</dt>
+              <dd>
+                <a
+                  href={help.source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  {help.source.label}
+                </a>
+              </dd>
+            </div>
+          </dl>
+        </details>
+      </div>
     </section>
   );
 }
