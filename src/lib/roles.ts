@@ -7,6 +7,12 @@ const DEFAULT_LABEL: Record<Role, string> = {
   GUEST: "Guest",
 };
 
-/** The workspace's own name for a role, or the default one. Labels never change permissions. */
-export const roleLabel = (labels: Record<string, string>, role: Role) =>
-  labels[role] || DEFAULT_LABEL[role];
+/**
+ * The workspace's own name for a role, or the default one (in English, or in the language of
+ * `defaults`: pass `t.roles`). Labels never change permissions.
+ */
+export const roleLabel = (
+  labels: Record<string, string>,
+  role: Role,
+  defaults: Record<Role, string> = DEFAULT_LABEL,
+) => labels[role] || defaults[role];

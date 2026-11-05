@@ -6,10 +6,10 @@ import { TaskFilters } from "@/components/task-filters";
 import { TaskTable } from "@/components/task-table";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { VIEWS, parseView } from "@/lib/list-view";
-import { messages } from "@/lib/messages";
 import { roleLabel } from "@/lib/roles";
 import { isFiltered, parseFilter } from "@/lib/validations/filters";
 import { ApiError } from "@/server/http";
+import { getT } from "@/server/i18n";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
 import { listCatalog } from "@/server/services/catalog";
@@ -23,6 +23,7 @@ export default async function ListPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await loadUser();
+  const { t } = await getT();
   const query = await searchParams;
   const filter = parseFilter(query);
   const { view, sort, dir } = parseView(query);
@@ -85,7 +86,7 @@ export default async function ListPage({
             )}
           </div>
         </div>
-        <nav aria-label={messages.views.label} className="flex gap-2">
+        <nav aria-label={t.views.label} className="flex gap-2">
           {VIEWS.map((v) => (
             <Link
               key={v}
@@ -93,7 +94,7 @@ export default async function ListPage({
               aria-current={v === view ? "page" : undefined}
               className={v === view ? "btn" : "btn-secondary"}
             >
-              {messages.views[v]}
+              {t.views[v]}
             </Link>
           ))}
         </nav>

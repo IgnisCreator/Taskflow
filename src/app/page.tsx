@@ -1,56 +1,9 @@
 import Link from "next/link";
 import { startDemo } from "@/app/demo-actions";
 import { githubLogin } from "@/lib/env";
+import { getT } from "@/server/i18n";
 import { demoEnabled } from "@/server/services/demo";
 import { getCurrentUser } from "@/server/session";
-
-const FEATURES = [
-  {
-    title: "Shared boards",
-    text: "Bring up to 20 people into a workspace, with spaces, folders and lists. Everyone sees the same boards and changes show up within seconds.",
-  },
-  {
-    title: "Roles that make sense",
-    text: "Admins manage the team, members move and edit tasks, viewers only read. The server enforces it, not just the buttons.",
-  },
-  {
-    title: "Drag, or use the keyboard",
-    text: "Drag cards between columns, or pick a column and position from the task dialog. Both work with a keyboard.",
-  },
-  {
-    title: "Find things fast",
-    text: "Search by title or description and filter by assignee or priority. Filters live in the URL, so you can share them.",
-  },
-  {
-    title: "No lost edits",
-    text: "If two people change the board at once, nobody is overwritten silently: you are told and your text is kept.",
-  },
-  {
-    title: "Light and dark",
-    text: "Follows your system theme, or pick one from the header.",
-  },
-];
-
-const PRINCIPLES = [
-  {
-    title: "Make the work visible",
-    text: "Every task is a card on a board, so nothing hides in someone's head or inbox.",
-  },
-  {
-    title: "Limit what is in progress",
-    text: "Fewer things started at once means more things actually finished. Kanban teams cap each column.",
-  },
-  {
-    title: "Watch the flow",
-    text: "Cards move left to right. Where they pile up is where the process is stuck.",
-  },
-];
-
-const EXAMPLE = [
-  { name: "To do", cards: ["Write the report", "Book the venue"] },
-  { name: "In progress", cards: ["Design the poster"] },
-  { name: "Done", cards: ["Pick a date", "Invite the team"] },
-];
 
 export default async function HomePage({
   searchParams,
@@ -61,37 +14,35 @@ export default async function HomePage({
   const limited = demo === "limit";
   const busy = demo === "busy";
   const user = await getCurrentUser();
+  const { t } = await getT();
+  const l = t.landing;
   const cta = user
-    ? { href: "/workspaces", label: "Go to your workspaces" }
+    ? { href: "/workspaces", label: l.goToWorkspaces }
     : {
         href: "/login",
-        label: githubLogin() ? "Sign in with GitHub" : "Sign in",
+        label: githubLogin() ? l.signInGithub : l.signIn,
       };
 
   return (
     <main className="space-y-20">
       <section className="space-y-6 py-6 text-center sm:py-12">
-        <p className="badge normal-case">Kanban for small teams</p>
+        <p className="badge normal-case">{l.badge}</p>
         <h1 className="mx-auto max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
-          See what your team is working on, at a glance
+          {l.title}
         </h1>
-        <p className="mx-auto max-w-xl text-lg text-muted">
-          TaskFlow is a Kanban tool for teams. Organise your work in spaces and
-          lists, add tasks, and move them from idea to done together.
-        </p>
+        <p className="mx-auto max-w-xl text-lg text-muted">{l.intro}</p>
         <p className="flex flex-wrap justify-center gap-3">
           <Link href={cta.href} className="btn px-5 py-3 text-base">
             {cta.label}
           </Link>
           {limited && (
             <span role="alert" className="error w-full">
-              Too many attempts to open the demo from this address. Try again
-              later.
+              {t.demo.limit}
             </span>
           )}
           {busy && (
             <span role="alert" className="error w-full">
-              The demo is full right now. Try again in a little while.
+              {t.demo.busy}
             </span>
           )}
           {!user && demoEnabled() && (
@@ -100,40 +51,31 @@ export default async function HomePage({
                 type="submit"
                 className="btn-secondary px-5 py-3 text-base"
               >
-                Explore the demo
+                {t.demo.explore}
               </button>
             </form>
           )}
           <a href="#kanban" className="btn-secondary px-5 py-3 text-base">
-            What is Kanban?
+            {l.whatIsKanban}
           </a>
         </p>
         {!user && demoEnabled() && (
-          <p className="text-sm text-muted">
-            The demo opens your own sandbox with made-up data. You can change
-            anything in it; it is deleted after 24 hours.
-          </p>
+          <p className="text-sm text-muted">{t.demo.caption}</p>
         )}
       </section>
 
       <section id="kanban" className="scroll-mt-8 space-y-8">
         <div className="space-y-3">
-          <h2 className="text-2xl font-semibold">What is Kanban?</h2>
-          <p className="max-w-2xl text-muted">
-            Kanban (Japanese for &ldquo;signboard&rdquo;) is a way to manage
-            work with a board. It started in Toyota factories in the 1940s and
-            1950s, where cards told each station what to make next, and software
-            teams adopted it later. The board has columns for the stages of your
-            work; each task is a card that moves through them.
-          </p>
+          <h2 className="text-2xl font-semibold">{l.whatIsKanban}</h2>
+          <p className="max-w-2xl text-muted">{l.kanbanText}</p>
         </div>
 
         <div
           role="img"
-          aria-label="Example board: To do has two cards, In progress has one, Done has two."
+          aria-label={l.exampleLabel}
           className="grid gap-3 sm:grid-cols-3"
         >
-          {EXAMPLE.map((column) => (
+          {l.exampleColumns.map((column) => (
             <div
               key={column.name}
               aria-hidden="true"
@@ -156,24 +98,21 @@ export default async function HomePage({
         </div>
 
         <ol className="grid gap-4 sm:grid-cols-3">
-          {PRINCIPLES.map((item, index) => (
+          {l.principles.map((item, index) => (
             <li key={item.title} className="card space-y-2">
-              <span className="badge">Step {index + 1}</span>
+              <span className="badge">{l.step(index + 1)}</span>
               <h3 className="font-semibold">{item.title}</h3>
               <p className="text-sm text-muted">{item.text}</p>
             </li>
           ))}
         </ol>
-        <p className="text-sm text-muted">
-          TaskFlow gives you the board, the cards and the flow. It does not
-          enforce limits per column yet; that part is up to the team.
-        </p>
+        <p className="text-sm text-muted">{l.note}</p>
       </section>
 
       <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">What TaskFlow does</h2>
+        <h2 className="text-2xl font-semibold">{l.doesTitle}</h2>
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature) => (
+          {l.features.map((feature) => (
             <li key={feature.title} className="card space-y-2">
               <h3 className="font-semibold">{feature.title}</h3>
               <p className="text-sm text-muted">{feature.text}</p>
@@ -183,11 +122,8 @@ export default async function HomePage({
       </section>
 
       <section className="card space-y-4 text-center">
-        <h2 className="text-2xl font-semibold">Ready to try it?</h2>
-        <p className="text-muted">
-          Sign in, create a workspace, and every new list starts with four
-          columns.
-        </p>
+        <h2 className="text-2xl font-semibold">{l.readyTitle}</h2>
+        <p className="text-muted">{l.readyText}</p>
         <p>
           <Link href={cta.href} className="btn px-5 py-3 text-base">
             {cta.label}

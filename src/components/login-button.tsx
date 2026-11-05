@@ -1,8 +1,10 @@
 "use client";
 
+import { useT } from "@/components/lang-provider";
 import { authClient } from "@/lib/auth-client";
 
 export function LoginButton() {
+  const { t } = useT();
   return (
     <button
       type="button"
@@ -14,7 +16,7 @@ export function LoginButton() {
         })
       }
     >
-      Sign in with GitHub
+      {t.landing.signInGithub}
     </button>
   );
 }

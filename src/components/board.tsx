@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { dropTarget, moveTask } from "@/lib/board-order";
 import { formatDueDate } from "@/lib/dates";
-import { messages } from "@/lib/messages";
+import { useT } from "@/components/lang-provider";
 import { useVersionPolling } from "@/lib/use-version-polling";
 import {
   TaskDialog,
@@ -67,6 +67,7 @@ export function Board({
   filtered: boolean;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -84,8 +85,7 @@ export function Board({
     listId,
     boardVersion,
     paused: busy,
-    onChange: () =>
-      setNotice({ kind: "info", text: messages.board.updatedByOthers }),
+    onChange: () => setNotice({ kind: "info", text: t.board.updatedByOthers }),
   });
 
   useEffect(() => {
@@ -191,7 +191,7 @@ export function Board({
         }}
       >
         {filtered && shown.every((column) => column.tasks.length === 0) && (
-          <p className="notice">{messages.board.noMatches}</p>
+          <p className="notice">{t.board.noMatches}</p>
         )}
         {/* One row of columns that share the width and scroll sideways past ~4, so the line of the flow never wraps. */}
         <div className="grid auto-cols-[minmax(17rem,1fr)] grid-flow-col gap-4 overflow-x-auto pb-3">
@@ -259,6 +259,7 @@ function BoardColumn({
   onOpen: (task: TaskView) => void;
   onAdd: () => void;
 }) {
+  const { t } = useT();
   const { setNodeRef, isOver } = useDroppable({ id: columnDropId(column.id) });
   // Over the limit counts every task of the stage, also those a filter hides.
   const count = filtered ? column.total : column.tasks.length;
@@ -284,7 +285,7 @@ function BoardColumn({
       {column.policy && <p className="text-xs text-muted">{column.policy}</p>}
       {over && (
         <p className="error text-xs">
-          {messages.board.overLimit(count, column.wipLimit!)}
+          {t.board.overLimit(count, column.wipLimit!)}
         </p>
       )}
       <ul className="space-y-2">
@@ -300,11 +301,11 @@ function BoardColumn({
         ))}
       </ul>
       {column.tasks.length === 0 && (
-        <p className="text-sm text-muted">{messages.board.noTasks}</p>
+        <p className="text-sm text-muted">{t.board.noTasks}</p>
       )}
       {canWrite && (
         <button type="button" className="btn-secondary w-full" onClick={onAdd}>
-          {messages.board.addTask}
+          {t.board.addTask}
         </button>
       )}
     </section>
