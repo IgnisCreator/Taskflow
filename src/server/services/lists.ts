@@ -6,6 +6,7 @@ import type {
 import { db } from "@/server/db";
 import { ApiError } from "@/server/http";
 import { readListAccess, withListLock, withSpaceLock } from "@/server/locks";
+import { sandboxRoom } from "@/server/sandbox";
 import { flowForNewList } from "@/server/services/templates";
 
 const listSelect = {
@@ -32,6 +33,7 @@ export async function createList(userId: string, input: CreateListInput) {
     spaceId,
     "structure:manage",
     async (tx, { workspaceId }) => {
+      await sandboxRoom(tx, workspaceId, "lists");
       const space = await tx.space.findUniqueOrThrow({
         where: { id: spaceId },
         select: { defaultTemplate: true },

@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 export async function getCurrentUser() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
-  return db.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
@@ -15,6 +15,12 @@ export async function getCurrentUser() {
       image: true,
       publicId: true,
       isDemo: true,
+      sandboxUntil: true,
     },
   });
+  // A sandbox is over when its 24 hours are, whether or not the daily job has deleted it yet.
+  if (user?.sandboxUntil && user.sandboxUntil.getTime() <= Date.now()) {
+    return null;
+  }
+  return user;
 }

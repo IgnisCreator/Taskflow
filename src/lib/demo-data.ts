@@ -15,14 +15,20 @@ export const DEMO_DAYS = 180;
 /** The 6-week stretch in which review is short of reviewers, in weekdays. */
 export const BOTTLENECK_WEEKDAYS = 30;
 
-/** Made-up teammates; the demo visitor is a separate read-only guest. */
+/**
+ * Made-up teammates. The visitor of a sandbox is its OWNER (there is one owner by policy), so with
+ * these every role is present. The simulation only uses the first five; the guest does no work, they
+ * just see the one space they are listed in (`DEMO_GUEST_SPACE`).
+ */
 export const DEMO_PEOPLE = [
-  { name: "Dana Reyes", role: "OWNER" },
+  { name: "Dana Reyes", role: "ADMIN" },
   { name: "Marco Silva", role: "ADMIN" },
   { name: "Priya Nair", role: "MEMBER" },
   { name: "Tom Becker", role: "MEMBER" },
   { name: "Lucia Fernandez", role: "MEMBER" },
+  { name: "Sam Okafor", role: "GUEST" },
 ] as const;
+export const DEMO_GUEST_SPACE = "Support";
 export const DEMO_LABELS = ["frontend", "backend", "customer", "urgent"];
 
 export type DemoEvent = {

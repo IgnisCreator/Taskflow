@@ -21,7 +21,7 @@ const ACCOUNT_CHANGES = new Set([
   "/update-user",
   "/delete-user",
   "/set-password",
-  "/list-sessions", // would show the address and browser of every other visitor
+  "/list-sessions",
   "/revoke-session",
   "/revoke-sessions",
   "/revoke-other-sessions",
@@ -70,15 +70,21 @@ The link works for one hour. If you did not create an account, ignore this messa
         defaultValue: false,
         input: false,
       },
+      // Set by the server for the temporary demo visitor: when its sandbox is deleted.
+      sandboxUntil: { type: "date", required: false, input: false },
     },
   },
   hooks: {
-    // The demo visitor is a shared account: it cannot change the password, the email or anything else.
+    // A demo account (a sandbox visitor) cannot change the password, the email or anything else about the account.
     before: createAuthMiddleware(async (ctx) => {
       if (!ACCOUNT_CHANGES.has(ctx.path)) return;
       const session = await getSessionFromCtx(ctx);
-      if ((session?.user as { isDemo?: boolean } | undefined)?.isDemo) {
-        throw new APIError("FORBIDDEN", { message: "The demo is read-only" });
+      const user = session?.user as
+        { isDemo?: boolean; sandboxUntil?: Date | null } | undefined;
+      if (user?.isDemo || user?.sandboxUntil) {
+        throw new APIError("FORBIDDEN", {
+          message: "This is not available in the demo",
+        });
       }
     }),
   },

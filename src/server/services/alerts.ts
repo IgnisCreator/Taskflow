@@ -10,9 +10,12 @@ import { listMetricsData } from "@/server/services/metrics";
  * The daily job: for every list, work out which alerts hold today and make the notifications say
  * the same. A condition that holds and has no open notification gets one; an open notification whose
  * condition no longer holds is resolved. Running it twice in a row changes nothing.
+ *
+ * Without a scope it skips the demo sandboxes (their number would make the job grow with the
+ * visitors; each one is checked once, when it is built). With `workspaceId` it checks only that one.
  */
-export async function runAlerts(now = Date.now()) {
-  const lists = await loadLists();
+export async function runAlerts(now = Date.now(), workspaceId?: string) {
+  const lists = await loadLists(workspaceId);
   const totals = { lists: lists.length, created: 0, resolved: 0, failed: 0 };
   for (const list of lists) {
     try {
@@ -33,8 +36,17 @@ export async function runAlerts(now = Date.now()) {
 }
 
 type ListToCheck = Awaited<ReturnType<typeof loadLists>>[number];
-const loadLists = () =>
+const loadLists = (workspaceId?: string) =>
   db.list.findMany({
+    where: workspaceId
+      ? { space: { workspaceId } }
+      : {
+          space: {
+            workspace: {
+              members: { none: { user: { sandboxUntil: { not: null } } } },
+            },
+          },
+        },
     select: {
       id: true,
       name: true,
@@ -46,7 +58,6 @@ const loadLists = () =>
           isPrivate: true,
           workspaceId: true,
           members: { select: { userId: true } },
-          workspace: { select: { isDemo: true } },
         },
       },
     },
@@ -82,14 +93,7 @@ async function reconcile(tx: Tx, list: ListToCheck, now: number) {
     where: { taskId: { in: alerts.flatMap((a) => a.taskId ?? []) } },
     select: { taskId: true, userId: true },
   });
-  // In the public demo the read-only visitor (a guest) also sees every alert of the sample lists.
-  const visitors = list.space.workspace.isDemo
-    ? members.filter((m) => m.role === "GUEST").map((m) => m.userId)
-    : [];
-  const recipients = (alert: Alert) => [
-    ...new Set([...intended(alert), ...visitors]),
-  ];
-  const intended = (alert: Alert) => {
+  const recipients = (alert: Alert) => {
     if (!alert.taskId) return admins.map((m) => m.userId);
     const own = assignees
       .filter(

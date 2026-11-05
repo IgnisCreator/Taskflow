@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { ApiError, handle, json } from "@/server/http";
 import { runAlerts } from "@/server/services/alerts";
-import { demoEnabled, regenerateDemo } from "@/server/services/demo";
+import { purgeSandboxes } from "@/server/services/demo";
 import { purgeRateLimits } from "@/server/rate-limit";
 import { sendDigests } from "@/server/services/digest";
 
@@ -18,13 +18,13 @@ export const GET = handle(async (request: Request) => {
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) {
     throw new ApiError(401, "UNAUTHORIZED", "Bad cron secret");
   }
-  // The demo first, so its alerts are computed on fresh data; a failure there must not stop the rest.
-  const demo = demoEnabled()
-    ? await regenerateDemo().catch((error: Error) => {
-        console.error("Demo regeneration failed:", error.name);
-        return { failed: true as const };
-      })
-    : null;
+  // Demo sandboxes past their 24 hours go first; a failure there must not stop the rest.
+  const demo = await purgeSandboxes()
+    .then((purged) => ({ purged }))
+    .catch((error: Error) => {
+      console.error("Sandbox purge failed:", error.name);
+      return { failed: true as const };
+    });
   const alerts = await runAlerts();
   const digests = await sendDigests();
   const rateLimits = await purgeRateLimits();

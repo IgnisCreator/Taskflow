@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { leaveDemo, restartDemo } from "@/app/demo-actions";
 import { getCurrentUser } from "@/server/session";
 import { unreadCount } from "@/server/services/notifications";
 import { ThemeToggle, type Theme } from "@/components/theme-toggle";
@@ -70,17 +71,31 @@ export default async function RootLayout({
             <ThemeToggle initial={theme} />
           </nav>
         </header>
-        {user?.isDemo && (
-          <p
+        {user?.sandboxUntil && (
+          <div
             role="note"
-            className="border-b border-line bg-subtle px-4 py-2 text-center text-sm"
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-line bg-subtle px-4 py-2 text-center text-sm"
           >
-            You are exploring a read-only demo with made-up data. It is renewed
-            every day.{" "}
-            <Link href="/profile" className="link">
-              Leave the demo
-            </Link>
-          </p>
+            <span>
+              This is your own demo space, with made-up data. It is deleted on{" "}
+              {user.sandboxUntil.toLocaleString("en-GB", {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: "UTC",
+              })}{" "}
+              UTC, 24 hours after you opened it.
+            </span>
+            <form action={restartDemo}>
+              <button type="submit" className="link">
+                Restart demo
+              </button>
+            </form>
+            <form action={leaveDemo}>
+              <button type="submit" className="link">
+                Leave and delete it
+              </button>
+            </form>
+          </div>
         )}
         <div id="content" className="mx-auto max-w-[90rem] px-4 py-6">
           {children}

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  assertNotDemo,
   assertSameOrigin,
   handle,
   noContent,
@@ -17,7 +16,6 @@ const bodySchema = z.strictObject({
 export const POST = handle(async (request: Request) => {
   assertSameOrigin(request);
   const user = await requireUser();
-  assertNotDemo(user); // the visitor is one shared account: reading would clear it for everyone
   const { id } = await readJson(request, bodySchema);
   await markRead(user.id, id);
   return noContent();
