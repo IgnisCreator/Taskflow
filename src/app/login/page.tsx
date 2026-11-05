@@ -1,17 +1,19 @@
 import { EmailLoginForm } from "@/components/email-login-form";
 import { LoginButton } from "@/components/login-button";
 import { githubLogin, openAccess } from "@/lib/env";
+import { getT } from "@/server/i18n";
 
-export default function LoginPage() {
+export default async function LoginPage() {
   const github = githubLogin();
+  const { t } = await getT();
   return (
     <main className="mx-auto max-w-sm">
       <div className="card space-y-4 text-center">
-        <h1 className="text-2xl font-semibold">Sign in</h1>
+        <h1 className="text-2xl font-semibold">{t.login.title}</h1>
         {github && (
           <>
             <LoginButton />
-            <p className="text-sm text-muted">or use your email</p>
+            <p className="text-sm text-muted">{t.login.orEmail}</p>
           </>
         )}
         <EmailLoginForm allowSignUp={openAccess()} />

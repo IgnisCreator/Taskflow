@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useT } from "@/components/lang-provider";
 import { authClient } from "@/lib/auth-client";
 
 /** Changes the password of an account that has one; the other sessions are signed out. */
 export function ChangePasswordForm() {
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
@@ -17,7 +19,7 @@ export function ChangePasswordForm() {
     setError(null);
     setDone(false);
     if (next !== String(data.get("confirmPassword"))) {
-      setError("The new passwords do not match.");
+      setError(t.profile.mismatch);
       return;
     }
     setPending(true);
@@ -28,7 +30,12 @@ export function ChangePasswordForm() {
     });
     setPending(false);
     if (error) {
-      setError(error.message ?? "Could not change the password.");
+      const known = t.login.authErrors as Record<string, string | undefined>;
+      setError(
+        (error.code ? known[error.code] : undefined) ??
+          error.message ??
+          t.profile.changeFailed,
+      );
       return;
     }
     form.reset();
@@ -37,9 +44,9 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={onSubmit} className="card space-y-3">
-      <h2 className="text-lg font-semibold">Change password</h2>
+      <h2 className="text-lg font-semibold">{t.profile.changePassword}</h2>
       <label className="field">
-        Current password
+        {t.profile.currentPassword}
         <input
           name="currentPassword"
           type="password"
@@ -50,7 +57,7 @@ export function ChangePasswordForm() {
         />
       </label>
       <label className="field">
-        New password
+        {t.profile.newPassword}
         <input
           name="newPassword"
           type="password"
@@ -62,7 +69,7 @@ export function ChangePasswordForm() {
         />
       </label>
       <label className="field">
-        Repeat the new password
+        {t.profile.repeatPassword}
         <input
           name="confirmPassword"
           type="password"
@@ -73,9 +80,7 @@ export function ChangePasswordForm() {
           className="input"
         />
       </label>
-      <p className="text-xs text-muted">
-        At least 10 characters. Your other sessions are signed out.
-      </p>
+      <p className="text-xs text-muted">{t.profile.passwordHint}</p>
       {error && (
         <p role="alert" className="error">
           {error}
@@ -83,11 +88,11 @@ export function ChangePasswordForm() {
       )}
       {done && (
         <p role="status" className="notice">
-          Password changed.
+          {t.profile.changed}
         </p>
       )}
       <button type="submit" disabled={pending} className="btn">
-        Change password
+        {t.profile.changePassword}
       </button>
     </form>
   );

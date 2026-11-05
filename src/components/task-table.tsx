@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { formatDueDate } from "@/lib/dates";
 import { sortRows, type Dir, type Sort } from "@/lib/list-view";
-import { messages } from "@/lib/messages";
+import { useT } from "@/components/lang-provider";
 import { useVersionPolling } from "@/lib/use-version-polling";
 import {
   TaskDialog,
@@ -17,7 +17,6 @@ import {
   type TaskView,
 } from "@/components/task-dialog";
 
-const t = messages.table;
 const PRIORITY_LABEL = { LOW: "low", MEDIUM: "medium", HIGH: "high" } as const;
 
 type Row = TaskView & {
@@ -61,6 +60,8 @@ export function TaskTable({
   query: string;
 }) {
   const router = useRouter();
+  const { t: all } = useT();
+  const t = all.table;
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export function TaskTable({
     listId,
     boardVersion,
     paused: false,
-    onChange: () => setNotice(messages.board.updatedByOthers),
+    onChange: () => setNotice(all.board.updatedByOthers),
   });
   useEffect(() => {
     if (!notice) return;
@@ -163,7 +164,7 @@ export function TaskTable({
       )}
       {sorted.length === 0 ? (
         <p className="card text-muted">
-          {filtered ? messages.board.noMatches : t.empty}
+          {filtered ? all.board.noMatches : t.empty}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 
 /**
@@ -33,6 +34,7 @@ export function ApiForm({
   children?: ReactNode;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [typed, setTyped] = useState("");
@@ -86,7 +88,9 @@ export function ApiForm({
       {children}
       {confirmText && (
         <label className="field">
-          Type <strong>{confirmText}</strong> to confirm
+          {t.confirm.typeBefore}
+          <strong>{confirmText}</strong>
+          {t.confirm.typeAfter}
           <input
             value={typed}
             onChange={(event) => setTyped(event.target.value)}

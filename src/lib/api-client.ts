@@ -1,4 +1,4 @@
-import { messages } from "@/lib/messages";
+import { browserLang, catalogs } from "@/lib/i18n";
 
 type Failure = {
   ok: false;
@@ -18,6 +18,13 @@ export async function api(
   url: string,
   body: unknown,
 ): Promise<Success | Failure> {
+  const lang = browserLang();
+  const t = catalogs[lang];
+  // English keeps the server's own (more specific) message; other languages use the catalog by code.
+  const translated = (code: string | undefined) =>
+    lang === "en" || !code
+      ? undefined
+      : (t.errors.codes as Record<string, string | undefined>)[code];
   try {
     const res = await fetch(url, {
       method,
@@ -35,15 +42,20 @@ export async function api(
       conflict,
       currentVersion: payload.error?.currentVersion,
       message: conflict
-        ? messages.errors.conflict
-        : String(field ?? payload.error?.message ?? messages.errors.generic),
+        ? t.errors.conflict
+        : String(
+            field ??
+              translated(payload.error?.code) ??
+              payload.error?.message ??
+              t.errors.generic,
+          ),
     };
   } catch {
     return {
       ok: false,
       conflict: false,
       network: true,
-      message: messages.errors.network,
+      message: t.errors.network,
     };
   }
 }

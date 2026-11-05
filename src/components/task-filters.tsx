@@ -1,21 +1,19 @@
 import Link from "next/link";
 import type { CatalogView, MemberView } from "@/components/task-dialog";
 import type { Dir, Sort, View } from "@/lib/list-view";
-import { messages } from "@/lib/messages";
+import { getT } from "@/server/i18n";
 import {
   UNASSIGNED,
   isFiltered,
   type TaskFilter,
 } from "@/lib/validations/filters";
 
-const m = messages.filters;
-
 /**
  * A plain GET form: the filters live in the URL (shareable, survive a reload) and it works with the
  * keyboard and without client code. Submitting re-runs the page, and the filtering happens in SQL.
  * The view and the sort are carried in hidden fields so that filtering does not change them.
  */
-export function TaskFilters({
+export async function TaskFilters({
   filter,
   members,
   catalog,
@@ -30,6 +28,7 @@ export function TaskFilters({
   sort: Sort;
   dir: Dir;
 }) {
+  const m = (await getT()).t.filters;
   // What "Clear" goes back to: no filters, same view and sort.
   const keep = new URLSearchParams({ view, sort, dir }).toString();
   return (
