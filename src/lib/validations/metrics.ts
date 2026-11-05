@@ -60,6 +60,7 @@ export function parseMetricsQuery(
 export function parseMetricsPageQuery(
   params: Record<string, string | string[] | undefined>,
   now: number,
+  translate: (message: string) => string = (message) => message,
 ): { query: MetricsQuery; error: string | null } {
   // A form sends the fields it leaves empty as "": they mean "not set".
   const set = Object.fromEntries(
@@ -71,7 +72,7 @@ export function parseMetricsPageQuery(
     if (!(error instanceof z.ZodError)) throw error;
     return {
       query: parseMetricsQuery({}, now),
-      error: error.issues.map((issue) => issue.message).join(". "),
+      error: error.issues.map((issue) => translate(issue.message)).join(". "),
     };
   }
 }

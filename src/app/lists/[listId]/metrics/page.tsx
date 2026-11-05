@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { parseMetricsPageQuery } from "@/lib/validations/metrics";
+import { translateQueryError } from "@/lib/validations/query-errors";
+import { getT } from "@/server/i18n";
 import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { listCatalog } from "@/server/services/catalog";
 import { getList } from "@/server/services/lists";
@@ -18,11 +20,16 @@ export default async function ListMetricsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await loadUser();
+  const { t } = await getT();
   const { listId } = await params;
   const list = await getList(user.id, listId);
   if (!list) notFound();
   const now = currentTime();
-  const { query, error } = parseMetricsPageQuery(await searchParams, now);
+  const { query, error } = parseMetricsPageQuery(
+    await searchParams,
+    now,
+    (message) => translateQueryError(message, t),
+  );
   const [workspace, catalog, members, metrics] = await Promise.all([
     loadWorkspace(user.id, list.workspaceId),
     listCatalog(user.id, list.workspaceId),
@@ -38,7 +45,7 @@ export default async function ListMetricsPage({
             &larr; {list.name}
           </Link>
         </p>
-        <h1 className="text-2xl font-semibold">Metrics of {list.name}</h1>
+        <h1 className="text-2xl font-semibold">{t.metrics.title(list.name)}</h1>
         <MetricsPanel
           metrics={metrics}
           basePath={`/lists/${list.id}/metrics`}

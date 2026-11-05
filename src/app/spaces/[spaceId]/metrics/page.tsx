@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { parseMetricsPageQuery } from "@/lib/validations/metrics";
+import { translateQueryError } from "@/lib/validations/query-errors";
+import { getT } from "@/server/i18n";
 import { ApiError } from "@/server/http";
 import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { listCatalog } from "@/server/services/catalog";
@@ -18,9 +20,14 @@ export default async function SpaceMetricsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await loadUser();
+  const { t } = await getT();
   const { spaceId } = await params;
   const now = currentTime();
-  const { query, error } = parseMetricsPageQuery(await searchParams, now);
+  const { query, error } = parseMetricsPageQuery(
+    await searchParams,
+    now,
+    (message) => translateQueryError(message, t),
+  );
   const metrics = await getSpaceMetrics(user.id, spaceId, query, now).catch(
     (e) => {
       if (e instanceof ApiError && e.status === 404) notFound();
@@ -43,12 +50,9 @@ export default async function SpaceMetricsPage({
           </Link>
         </p>
         <h1 className="text-2xl font-semibold">
-          Metrics of the space {metrics.space.name}
+          {t.metrics.spaceTitle(metrics.space.name)}
         </h1>
-        <p className="text-muted">
-          All the lists of the space together. Their stages differ, so the
-          charts group them by category.
-        </p>
+        <p className="text-muted">{t.metrics.spaceIntro}</p>
         <MetricsPanel
           metrics={metrics}
           basePath={`/spaces/${spaceId}/metrics`}

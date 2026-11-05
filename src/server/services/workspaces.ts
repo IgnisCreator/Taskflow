@@ -2,17 +2,23 @@ import "server-only";
 import type { UpdateWorkspaceInput } from "@/lib/validations/workspaces";
 import { db } from "@/server/db";
 import { notFound, withWorkspaceLock } from "@/server/locks";
-import { DEFAULT_TYPES } from "@/server/services/catalog";
+import { catalogs, type Lang } from "@/lib/i18n";
 import { canSeeSpace } from "@/server/policies";
 
 /** Creates the workspace with its creator as OWNER and a first public space, in one transaction. */
-export async function createWorkspace(userId: string, name: string) {
+export async function createWorkspace(
+  userId: string,
+  name: string,
+  lang: Lang = "en",
+) {
   return db.workspace.create({
     data: {
       name,
       members: { create: { userId, role: "OWNER" } },
       spaces: { create: { name: "General" } },
-      types: { create: DEFAULT_TYPES.map((name) => ({ name })) },
+      types: {
+        create: catalogs[lang].defaults.types.map((name) => ({ name })),
+      },
     },
     select: { id: true, name: true },
   });

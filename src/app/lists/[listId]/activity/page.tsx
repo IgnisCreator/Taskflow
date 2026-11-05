@@ -50,7 +50,7 @@ export default async function ActivityPage({
               <p>
                 {describeEvent(event, t)}
                 <span className="ml-2 text-muted">
-                  {formatDateTime(event.at, lang)} UTC
+                  {`${formatDateTime(event.at, lang)} UTC`}
                 </span>
               </p>
             </li>

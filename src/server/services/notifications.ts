@@ -16,6 +16,7 @@ async function visibleTo(userId: string, resolved: boolean) {
       id: true,
       kind: true,
       message: true,
+      params: true,
       createdAt: true,
       readAt: true,
       listId: true,

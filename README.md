@@ -15,6 +15,7 @@ It is a portfolio project: a demo, not a product. It runs entirely on free tiers
 - **Alerts.** WIP over its limit for several days, a widening cycle-time band, a task older than the 85th percentile, a drop in throughput. In-app notifications, plus an opt-in daily email.
 - **Forecast.** "When will it be done?" and "How many by this date?" answered by a seeded Monte Carlo simulation of your own history (10,000 runs). The seed and the history window are always shown, so a result can be reproduced.
 - **Public demo.** "Explore the demo" gives every visitor a private sandbox for 24 hours: their own copy of a sample workspace (a seeded 180-day simulation with a bottleneck in code review, and a made-up team with every role), where they can move tasks, edit and configure everything. It is deleted after 24 hours, or when they leave.
+- **English and Spanish.** A selector in the header switches the whole interface, the metrics and their explanations, the alerts and the sample workspace. The first visit follows the browser language. What people type (tasks, lists, comments, stage names) is never translated.
 
 ## Architecture
 
@@ -53,6 +54,7 @@ The detailed decision records are kept outside the repository; the ones that sha
 - **PostgreSQL does the coordination.** Per-list and per-workspace advisory locks serialize concurrent edits; the alerts job takes an advisory lock too; rate limits are rows in the database. No Redis, nothing else to host.
 - **Pure engines, tested hard.** Percentiles are nearest-rank, days are UTC, the forecast uses a seeded generator (mulberry32) so tests assert exact numbers.
 - **Better Auth** for sessions, with email and password. GitHub login exists for development only.
+- **Typed catalogs, no i18n library.** `src/lib/i18n/en.ts` is the source of truth and `es.ts` has the same type, so a missing translation does not compile; a lint rule rejects bare text in pages and components. Alerts are stored as data (`kind` plus parameters) and written in the reader's language when they are shown.
 - **Closed by default.** Production runs with no public sign-up and no GitHub login; accounts are created by script (`npm run user:create`). `OPEN_ACCESS=1` opens the doors for development and tests.
 - **A demo that cannot hurt.** Each visitor is a temporary user (a password derived from the server secret, a deadline in `sandboxUntil`) who owns one workspace and nothing else. The deadline is enforced on every request, not only by the daily purge; account changes, inviting people by email and a second workspace are refused; each sandbox has caps (tasks, comments, lists, spaces) and the number of live sandboxes is capped. The purge deletes only users that have a deadline, and the workspaces they own.
 - **Basic security headers, no strict CSP yet.** A strict Content-Security-Policy needs per-request nonces; it is recorded as debt rather than shipped half-working.
@@ -165,7 +167,7 @@ CI runs the same steps on every pull request and on `main`, and reports `npm aud
 
 ## How AI tools were used
 
-TaskFlow was built with Claude Code (Anthropic) as the main pair-programming tool, working milestone by milestone: the owner set the requirements and the design decisions, the assistant wrote most of the code and tests, and each milestone was validated by the full pipeline in a clean clone before it was merged. The README was drafted by the assistant and reviewed by the owner. The repository vouches for its behaviour through its tests, not through who wrote the code: 880+ unit and integration tests and 60+ browser tests.
+TaskFlow was built with Claude Code (Anthropic) as the main pair-programming tool, working milestone by milestone: the owner set the requirements and the design decisions, the assistant wrote most of the code and tests, and each milestone was validated by the full pipeline in a clean clone before it was merged. The README was drafted by the assistant and reviewed by the owner. The repository vouches for its behaviour through its tests, not through who wrote the code: 900+ unit and integration tests and 70 browser tests.
 
 ## Limitations
 

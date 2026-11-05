@@ -600,4 +600,305 @@ export const es: Catalog = {
       ],
     },
   },
+  alerts: {
+    wipOverLimit: (stage, days, count, limit) =>
+      `"${stage}" lleva ${days} días por encima de su límite de WIP (${count} de ${limit}). Termina algo antes de traer más.`,
+    bandWidening: (stage, from, to, days) =>
+      `"${stage}" ha pasado de ${from} a ${to} tareas en ${days} días sin reducirse: el trabajo llega más rápido de lo que sale.`,
+    taskAging: (title, days, p85) =>
+      `"${title}" lleva ${days} días en curso, más que el 85 % de las tareas terminadas (${p85} días).`,
+    throughputDrop: (week, count, average, percent) =>
+      `La semana del ${week} terminó ${count} tareas, frente a ${average} a la semana de media antes: una caída del ${percent} %.`,
+    aTask: "Una tarea",
+  },
+  queryErrors: {
+    badDate: "Usa una fecha real con el formato AAAA-MM-DD",
+    future: "El intervalo no puede terminar en el futuro",
+    endsBefore: "El intervalo no puede terminar antes de empezar",
+    tooLong: (max) => `El intervalo puede tener como máximo ${max} días`,
+    tasksWhole: "El número de tareas debe ser un número entero",
+    tasksMin: "El número de tareas debe ser al menos 1",
+    tasksMax: (max) => `El número de tareas puede ser como máximo ${max}`,
+    seedWhole: "La semilla debe ser un número entero",
+    seedMin: "La semilla no puede ser negativa",
+    seedMax: (max) => `La semilla puede ser como máximo ${max}`,
+    both: "Elige un número de tareas o una fecha, no ambos",
+    dateAfter: "La fecha debe ser posterior a hoy",
+    dateAhead: (max) => `La fecha puede estar como máximo a ${max} días de hoy`,
+  },
+  metricHelp: {
+    cfd: {
+      title: "Diagrama de flujo acumulado",
+      what: "Cuántas tareas había en cada etapa al final de cada día, apiladas de hecho (abajo) a por hacer (arriba).",
+      why: "Muestra los cuellos de botella pronto, antes de que alguien se queje: el trabajo se acumula donde no fluye.",
+      read: "Bandas paralelas significan un flujo estable. Una banda que se ensancha sin parar es un cuello de botella. Una banda de hecho plana significa que no se termina nada. El ancho de una banda es el trabajo de esa etapa.",
+      sourceLabel: "Glosario de Kanban University",
+    },
+    cycleTime: {
+      title: "Tiempo de ciclo",
+      what: "Días desde que el trabajo empezó (el punto de compromiso) hasta que se terminó, para cada tarea terminada en el intervalo.",
+      why: "Dice cuánto tarda un trabajo una vez que te comprometes con él, para que puedas hacer promesas que cumplas.",
+      read: "Cada punto es una tarea terminada. La línea del percentil 85 dice: el 85 % de las tareas tardó esto o menos. Los puntos muy por encima de la línea son los que conviene preguntar.",
+      sourceLabel: "Guía Kanban",
+    },
+    aging: {
+      title: "Antigüedad del trabajo",
+      what: "Días desde que empezó el trabajo, para cada tarea que está en curso ahora mismo.",
+      why: "El tiempo de ciclo solo cuenta lo que ya se terminó; la antigüedad avisa de lo que está atascado antes de que termine.",
+      read: "Una tarea por encima de la línea del percentil 85 del tiempo de ciclo es más antigua que la mayoría de las terminadas: merece atención ya.",
+      sourceLabel: "Guía Kanban",
+    },
+    throughput: {
+      title: "Rendimiento",
+      what: "Cuántas tareas se terminaron cada semana. Las tareas descartadas no cuentan.",
+      why: "Es el ritmo real del equipo y la base para pronosticar cuánto se hará.",
+      read: "Mira la tendencia, no una semana. Una tendencia a la baja con el trabajo en curso creciendo significa que se empieza pero no se termina.",
+      sourceLabel: "Guía Kanban",
+    },
+    wip: {
+      title: "Trabajo en curso",
+      what: "Cuántas tareas hay ahora en etapas activas o en espera, etapa por etapa, frente al límite de cada una.",
+      why: "Empezar menos y terminar más es más rápido: demasiado trabajo a la vez lo frena todo.",
+      read: "Una etapa por encima de su límite es una señal para terminar algo antes de traer más. Aquí los límites son un consejo, nada se bloquea.",
+      sourceLabel: "Guía Kanban",
+    },
+    forecast: {
+      title: "Pronóstico Monte Carlo",
+      what: "Una simulación que repite miles de veces tu propio ritmo pasado para decir cuándo estará hecho un número de tareas, o cuántas estarán hechas en una fecha, con una probabilidad para cada respuesta.",
+      why: "Una sola fecha esconde la incertidumbre; las probabilidades te permiten prometer lo que puedes cumplir, y la respuesta del 85 % es la que más equipos asumen.",
+      read: "Léelo como “en 85 de cada 100 futuros simulados estuvo hecho para esta fecha”. El 50 % es una moneda al aire, nunca una promesa. Supone que el futuro se parece al intervalo que elegiste: si el proceso cambió, acorta el intervalo.",
+      sourceLabel: "ProKanban: pronosticar entregas",
+    },
+    efficiency: {
+      title: "Eficiencia del flujo",
+      what: "Del tiempo que las tareas terminadas pasaron en curso, la parte en la que alguien estuvo trabajando de verdad en ellas (sin esperar ni estar bloqueadas).",
+      why: "La mayor parte del tiempo de una tarea suele ser espera; esto lo hace visible.",
+      read: "Un número bajo es normal y no es un objetivo en sí mismo: muestra dónde se pierde el tiempo. Es una medida complementaria, no una de las cuatro oficiales.",
+      sourceLabel: "Glosario de Kanban University",
+    },
+  },
+  metrics: {
+    title: (list) => `Métricas de ${list}`,
+    spaceTitle: (space) => `Métricas del espacio ${space}`,
+    spaceIntro:
+      "Todas las listas del espacio juntas. Sus etapas son distintas, así que los gráficos las agrupan por categoría.",
+    rangeLabel: "Intervalo y filtros",
+    from: "Desde",
+    to: "Hasta",
+    type: "Tipo",
+    anyType: "Cualquier tipo",
+    noType: "Sin tipo",
+    assignee: "Responsable",
+    anyone: "Cualquiera",
+    unassigned: "Sin asignar",
+    apply: "Aplicar",
+    last: "Últimos (días UTC)",
+    days: (n) => `${n} días`,
+    openForecast: "Abrir el pronóstico",
+    errorSuffix: "Se muestran los últimos 30 días.",
+    figures: {
+      median: "Tiempo de ciclo mediano",
+      finished: "Terminadas",
+      inProgress: "En curso ahora",
+      older: "Más antiguas que el 85 % de las terminadas",
+    },
+    expand: "Ampliar",
+    back: "Volver al panel",
+    showData: "Mostrar los datos",
+    whatIs: "Qué es esto y cómo leerlo",
+    what: "Qué es",
+    why: "Por qué importa",
+    read: "Cómo leerlo",
+    source: "Fuente",
+    tasks: (n) => (n === 1 ? "1 tarea" : `${n} tareas`),
+    deletedStage: (name) => `Etapa eliminada (${name})`,
+    cfd: {
+      svg: "Diagrama de flujo acumulado",
+      none: "Todavía no hay historial en este intervalo.",
+      summary: (date, total, parts) =>
+        `El ${date} había ${total} en el flujo: ${parts}.`,
+      part: (count, name) => `${count} en ${name}`,
+      caption: "Tareas por etapa al final de cada día",
+      day: "Día",
+    },
+    cycle: {
+      none: "No se terminó ninguna tarea en este intervalo.",
+      summary: (finished, p50, p85, p95, lead50, lead85) =>
+        `${finished} terminadas. La mitad tardó ${p50} o menos, el 85 % tardó ${p85} o menos y el 95 % tardó ${p95} o menos. Plazo de entrega (desde la creación): ${lead50} la mediana, ${lead85} al 85 %.`,
+      caption: "Tiempo de ciclo y de entrega de cada tarea terminada",
+      task: "Tarea",
+      finishedOn: "Terminada",
+      cycleDays: "Tiempo de ciclo (días)",
+      leadDays: "Plazo de entrega (días)",
+      svg: "Tiempo de ciclo de cada tarea terminada",
+      line: (percent, days) => `${percent} %: ${days}`,
+    },
+    aging: {
+      none: "No hay nada en curso ahora mismo.",
+      summary: (total, oldest) =>
+        `${total} en curso; la más antigua lleva ${oldest}.`,
+      noneOlder: (p85) =>
+        ` Ninguna es más antigua que el percentil 85 del tiempo de ciclo (${p85}).`,
+      someOlder: (n, p85) =>
+        ` ${n} más antiguas que el percentil 85 del tiempo de ciclo (${p85}).`,
+      caption: "Antigüedad de cada tarea en curso",
+      task: "Tarea",
+      stage: "Etapa",
+      ageDays: "Antigüedad (días)",
+      svg: "Antigüedad de cada tarea en curso, por etapa",
+      line: (p85) => `85 % de las terminadas: ${p85}`,
+    },
+    throughput: {
+      summary: (total, from, to) =>
+        `${total} terminadas entre el ${from} y el ${to}`,
+      perWeek: (average) => `, ${average} a la semana de media`,
+      caption: "Tareas terminadas por semana",
+      week: "Semana que empieza (lunes)",
+      finished: "Terminadas",
+      svg: "Tareas terminadas por semana",
+      bar: (week, n) => `Semana del ${week}: ${n}`,
+    },
+    wip: {
+      summary: (total) => `${total} en curso ahora.`,
+      over: " Al menos una etapa está por encima de su límite.",
+      of: (limit) => ` de ${limit}`,
+      overLimit: " (por encima del límite)",
+    },
+    efficiency: {
+      none: "No se terminó ninguna tarea en este intervalo.",
+      summary: (percent, active, waiting, blocked, reopened) =>
+        `El ${percent} % del tiempo en curso de las tareas terminadas fue trabajo activo (${active} días activos, ${waiting} en espera, ${blocked} de ellos bloqueados). Reabiertas en este intervalo: ${reopened}.`,
+    },
+  },
+  forecast: {
+    title: (list) => `Pronóstico de ${list}`,
+    intro:
+      "Una simulación Monte Carlo sobre el ritmo de esta lista: repite al azar, miles de veces, los días del intervalo de historial y dice lo probable que es cada resultado.",
+    historyFrom: "Historial desde",
+    to: "hasta",
+    seed: "Semilla",
+    workdays: "Solo días laborables (de lunes a viernes)",
+    whenTitle: "¿Cuándo estará hecho?",
+    numberOfTasks: "Número de tareas",
+    allPending: "Todas las pendientes",
+    forecastDate: "Pronosticar la fecha",
+    howManyTitle: "¿Cuántas para una fecha?",
+    dateAfter: "Fecha (posterior a hoy)",
+    forecastCount: "Pronosticar la cantidad",
+    historyWindow: "Intervalo de historial:",
+    errorSuffix: "Se muestra el valor predeterminado.",
+    nothingPending:
+      "No hay nada pendiente en esta lista (ninguna tarea por hacer, activa o en espera), así que no hay nada que pronosticar. Escribe un número de tareas para preguntar de todos modos.",
+    impossible: (from, to) =>
+      `No se terminó ninguna tarea entre el ${from} y el ${to}, así que no hay un ritmo que repetir. Elige un intervalo más largo o termina algo de trabajo primero.`,
+    noDays: (date) =>
+      `No hay días entre mañana y el ${date}, así que no se puede terminar nada más para entonces.`,
+    noWorkdays: (date) =>
+      `No hay días laborables entre mañana y el ${date}, así que no se puede terminar nada más para entonces.`,
+    howMany: (date, days, unit, p95, p85, p50) =>
+      `Para el ${date} (${days} ${unit} a partir de mañana) el equipo termina al menos ${p95} con un 95 % de probabilidad, ${p85} con un 85 % y ${p50} con un 50 %.`,
+    notWithin: (percent, horizon, unit) =>
+      `${percent} % de probabilidad: no en ${horizon} ${unit}`,
+    within: (percent, days, unit, date) =>
+      `${percent} % de probabilidad: en ${days} ${unit} (para el ${date})`,
+    whenSummary: (items, all, parts) =>
+      `Terminar ${items}${all ? " (todas las pendientes)" : ""} tarda, contando desde mañana: ${parts}.`,
+    unit: (n, workdays) =>
+      workdays
+        ? n === 1
+          ? "día laborable"
+          : "días laborables"
+        : n === 1
+          ? "día"
+          : "días",
+    whatDays: "Días hasta terminar",
+    whatWorkdays: "Días laborables hasta terminar",
+    whatTasks: "Tareas terminadas",
+    caption: (what, runs) => `${what} en ${runs} futuros simulados`,
+    simulated: "Futuros simulados",
+    share: "Proporción",
+    settings: (from, to, days, withData, finished, seed, workdaysOnly, runs) =>
+      `Historial del ${from} al ${to} (${days} días, ${withData} con tareas terminadas, ${finished} terminadas). Semilla ${seed}. ${workdaysOnly ? "Solo días laborables." : "Todos los días del calendario."} ${runs} futuros simulados; el mismo historial y la misma semilla dan siempre la misma respuesta.`,
+    barNote:
+      "Cada barra es la proporción de futuros simulados (%) que acabaron con ese resultado; las líneas discontinuas marcan el 50 %, el 85 % y el 95 %.",
+    svg: (what) => `Cómo se reparten los futuros simulados: ${what}`,
+    barTitle: (label, percent) => `${label}: ${percent} % de los futuros`,
+    warnings: {
+      fewDays: (have, need) =>
+        `Solo ${have} días de este intervalo tuvieron tareas terminadas (menos de ${need}): toma el pronóstico como una guía aproximada.`,
+      fewTasks: (have, need) =>
+        `Solo se terminaron ${have} tareas en este intervalo (menos de ${need}): hay poco ritmo del que aprender.`,
+    },
+  },
+  defaults: { types: ["Tarea", "Error", "Funcionalidad", "Petición"] },
+  sample: {
+    workspace: "Equipo de Producto de Acme",
+    spaces: { Software: "Software", Support: "Soporte" },
+    lists: {
+      Platform: "Plataforma",
+      "Customer requests": "Peticiones de clientes",
+    },
+    labels: ["frontend", "backend", "cliente", "urgente"],
+    verbs: [
+      "Corregir",
+      "Añadir",
+      "Refactorizar",
+      "Mejorar",
+      "Documentar",
+      "Migrar",
+      "Optimizar",
+      "Probar",
+      "Eliminar",
+      "Revisar",
+    ],
+    areas: [
+      "la redirección del inicio de sesión",
+      "los filtros de búsqueda",
+      "el webhook de pagos",
+      "la exportación de facturas",
+      "la subida de avatares",
+      "el limitador de peticiones",
+      "los ajustes de notificaciones",
+      "los widgets del panel",
+      "la importación de CSV",
+      "el registro de auditoría",
+      "el restablecimiento de contraseña",
+      "el tiempo de espera de la sesión",
+      "la lista de bienvenida",
+      "la paginación de la API",
+      "las plantillas de correo",
+      "los colores del tema oscuro",
+      "la invalidación de la caché",
+      "el programador de informes",
+    ],
+    issues: [
+      "No puedo iniciar sesión",
+      "La factura muestra un total incorrecto",
+      "La exportación falla por tiempo de espera",
+      "Petición: edición en bloque",
+      "Pregunta sobre permisos",
+      "Las notificaciones por correo llegan tarde",
+      "No puedo restablecer la contraseña",
+      "Faltan datos después de importar",
+      "Pregunta sobre webhooks",
+      "Cambio de dirección de facturación",
+      "El panel va lento",
+      "Solicitud de eliminación de cuenta",
+    ],
+    companies: [
+      "Acme",
+      "Globex",
+      "Initech",
+      "Umbrella",
+      "Hooli",
+      "Stark",
+      "Wayne",
+    ],
+    blocks: [
+      "Esperando las credenciales de la API del proveedor",
+      "Necesita una decisión de producto",
+      "El entorno de pruebas está caído",
+      "Esperando la revisión del diseño",
+    ],
+  },
 };

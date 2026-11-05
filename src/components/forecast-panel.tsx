@@ -1,23 +1,31 @@
 import Link from "next/link";
-import { ChartCard, M, PLOT_H, Svg, Table } from "@/components/metric-charts";
+import {
+  ChartCard,
+  M,
+  PLOT_H,
+  PLOT_W,
+  Svg,
+  Table,
+} from "@/components/metric-charts";
 import { axis, labelIndexes, linear } from "@/lib/charts";
-import { HORIZON_DAYS, MAX_ITEMS } from "@/lib/forecast";
+import { HORIZON_DAYS, MAX_ITEMS, forecastWarnings } from "@/lib/forecast";
+import { LOCALE, formatNumber } from "@/lib/i18n";
+import type { Catalog } from "@/lib/i18n/en";
 import { DAY_MS } from "@/lib/metrics";
+import { getT } from "@/server/i18n";
 import type { getListForecast } from "@/server/services/forecast";
 
 type Forecast = Awaited<ReturnType<typeof getListForecast>>;
 
 const PRESETS = [30, 90, 180];
-const tasks = (n: number) => (n === 1 ? "1 task" : `${n} tasks`);
-const unit = (n: number, workdays: boolean) =>
-  `${workdays ? "working " : ""}${n === 1 ? "day" : "days"}`;
 
 /** The settings every question shares: history window, working days and seed. */
-function Settings({ forecast }: { forecast: Forecast }) {
+function Settings({ forecast, t }: { forecast: Forecast; t: Catalog }) {
+  const f = t.forecast;
   return (
     <>
       <label className="field">
-        History from
+        {f.historyFrom}
         <input
           type="date"
           name="from"
@@ -26,7 +34,7 @@ function Settings({ forecast }: { forecast: Forecast }) {
         />
       </label>
       <label className="field">
-        to
+        {f.to}
         <input
           type="date"
           name="to"
@@ -35,7 +43,7 @@ function Settings({ forecast }: { forecast: Forecast }) {
         />
       </label>
       <label className="field">
-        Seed
+        {f.seed}
         <input
           type="number"
           name="seed"
@@ -51,36 +59,48 @@ function Settings({ forecast }: { forecast: Forecast }) {
           value="1"
           defaultChecked={forecast.workdaysOnly}
         />
-        Only working days (Monday to Friday)
+        {f.workdays}
       </label>
     </>
   );
 }
 
-function summary(forecast: Forecast): string {
+function summary(forecast: Forecast, t: Catalog): string {
+  const f = t.forecast;
   const { window, workdaysOnly } = forecast;
   if (forecast.question === "WHEN" && forecast.nothingPending) {
-    return "There is nothing pending in this list (no tasks in to do, active or waiting), so there is nothing to forecast. Enter a number of tasks to ask anyway.";
+    return f.nothingPending;
   }
-  if (!forecast.possible) {
-    return `No task was finished between ${window.from} and ${window.to}, so there is no pace to replay. Choose a longer window or finish some work first.`;
-  }
+  if (!forecast.possible) return f.impossible(window.from, window.to);
   if (forecast.question === "HOW_MANY") {
     if (forecast.days === 0) {
-      return `There are no ${workdaysOnly ? "working " : ""}days between tomorrow and ${forecast.date}, so nothing more can be finished by then.`;
+      return workdaysOnly
+        ? f.noWorkdays(forecast.date)
+        : f.noDays(forecast.date);
     }
     const [p50, p85, p95] = forecast.confidence;
-    return `By ${forecast.date} (${forecast.days} ${unit(forecast.days, workdaysOnly)} from tomorrow) the team finishes at least ${tasks(p95!.count!)} with 95% probability, ${tasks(p85!.count!)} with 85%, and ${tasks(p50!.count!)} with 50%.`;
+    return f.howMany(
+      forecast.date,
+      forecast.days,
+      f.unit(forecast.days, workdaysOnly),
+      t.metrics.tasks(p95!.count!),
+      t.metrics.tasks(p85!.count!),
+      t.metrics.tasks(p50!.count!),
+    );
   }
   const parts = forecast.confidence.map((c) =>
     c.days === null
-      ? `${c.percent}% probability: not within ${HORIZON_DAYS} ${unit(HORIZON_DAYS, workdaysOnly)}`
-      : `${c.percent}% probability: within ${c.days} ${unit(c.days, workdaysOnly)} (by ${c.date})`,
+      ? f.notWithin(c.percent, HORIZON_DAYS, f.unit(HORIZON_DAYS, workdaysOnly))
+      : f.within(c.percent, c.days, f.unit(c.days, workdaysOnly), c.date!),
   );
-  return `Finishing ${tasks(forecast.items)}${forecast.defaulted ? " (all the pending ones)" : ""} takes, counting from tomorrow: ${parts.join("; ")}.`;
+  return f.whenSummary(
+    t.metrics.tasks(forecast.items),
+    forecast.defaulted,
+    parts.join("; "),
+  );
 }
 
-export function ForecastPanel({
+export async function ForecastPanel({
   forecast,
   basePath,
   params,
@@ -92,6 +112,8 @@ export function ForecastPanel({
   params: Record<string, string>;
   error: string | null;
 }) {
+  const { lang, t } = await getT();
+  const f = t.forecast;
   const preset = (n: number) => {
     const next = new URLSearchParams(params);
     const to = Date.parse(`${forecast.window.to}T00:00:00Z`);
@@ -120,38 +142,42 @@ export function ForecastPanel({
   const share = (count: number) => (count / runs) * 100;
   const { max, ticks } = axis(Math.max(0, ...bins.map((b) => share(b.count))));
   const y = linear(0, max, M.t + PLOT_H, M.t);
-  const slot = (640 - M.l - M.r) / Math.max(bins.length, 1);
+  const slot = PLOT_W / Math.max(bins.length, 1);
   const binLabel = (b: { from: number; to: number }) =>
     b.from === b.to ? `${b.from}` : `${b.from}-${b.to}`;
   const what =
     forecast.question === "WHEN"
-      ? `${forecast.workdaysOnly ? "Working days" : "Days"} until done`
-      : "Tasks finished";
+      ? forecast.workdaysOnly
+        ? f.whatWorkdays
+        : f.whatDays
+      : f.whatTasks;
   const lineClass = ["stroke-control", "stroke-primary", "stroke-danger"];
+  const percent = (value: number) => formatNumber(value, lang);
+  const runsText = runs.toLocaleString(LOCALE[lang]);
 
   return (
     <div className="space-y-6">
       {error && (
         <p role="alert" className="card-danger text-danger-text">
-          {error}. Showing the default instead.
+          {error}. {f.errorSuffix}
         </p>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
         <form
           method="get"
           action={basePath}
-          aria-label="When will it be done?"
+          aria-label={f.whenTitle}
           className="card space-y-3"
         >
-          <h2 className="text-lg font-semibold">When will it be done?</h2>
+          <h2 className="text-lg font-semibold">{f.whenTitle}</h2>
           <label className="field">
-            Number of tasks
+            {f.numberOfTasks}
             <input
               type="number"
               name="items"
               min={1}
               max={MAX_ITEMS}
-              placeholder="All the pending ones"
+              placeholder={f.allPending}
               defaultValue={
                 forecast.question === "WHEN" && !forecast.defaulted
                   ? forecast.items
@@ -160,20 +186,20 @@ export function ForecastPanel({
               className="input"
             />
           </label>
-          <Settings forecast={forecast} />
+          <Settings forecast={forecast} t={t} />
           <button type="submit" className="btn">
-            Forecast the date
+            {f.forecastDate}
           </button>
         </form>
         <form
           method="get"
           action={basePath}
-          aria-label="How many by a date?"
+          aria-label={f.howManyTitle}
           className="card space-y-3"
         >
-          <h2 className="text-lg font-semibold">How many by a date?</h2>
+          <h2 className="text-lg font-semibold">{f.howManyTitle}</h2>
           <label className="field">
-            Date (after today)
+            {f.dateAfter}
             <input
               type="date"
               name="date"
@@ -184,59 +210,64 @@ export function ForecastPanel({
               className="input"
             />
           </label>
-          <Settings forecast={forecast} />
+          <Settings forecast={forecast} t={t} />
           <button type="submit" className="btn">
-            Forecast the count
+            {f.forecastCount}
           </button>
         </form>
       </div>
       <p className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">History window:</span>
+        <span className="text-muted">{f.historyWindow}</span>
         {PRESETS.map((n) => (
           <Link key={n} href={preset(n)} className="btn-secondary">
-            {n} days
+            {t.metrics.days(n)}
           </Link>
         ))}
       </p>
-      {forecast.warnings.map((warning) => (
-        <p key={warning} role="note" className="card-danger text-danger-text">
-          {warning}
+      {forecastWarnings(window).map((warning) => (
+        <p
+          key={warning.code}
+          role="note"
+          className="card-danger text-danger-text"
+        >
+          {warning.code === "FEW_DAYS"
+            ? f.warnings.fewDays(warning.have, warning.need)
+            : f.warnings.fewTasks(warning.have, warning.need)}
         </p>
       ))}
       <ChartCard
         metric="forecast"
-        summary={summary(forecast)}
+        summary={summary(forecast, t)}
         data={
           bins.length > 0 && (
             <Table
-              caption={`${what} in ${runs} simulated futures`}
-              head={[what, "Simulated futures", "Share"]}
+              caption={f.caption(what, runsText)}
+              head={[what, f.simulated, f.share]}
               rows={bins.map((b) => [
                 binLabel(b),
                 b.count,
-                `${share(b.count).toFixed(1)}%`,
+                `${percent(share(b.count))}%`,
               ])}
             />
           )
         }
       >
         <p data-testid="forecast-settings" className="text-sm text-muted">
-          History {window.from} to {window.to} ({window.days} days,{" "}
-          {window.daysWithData} with finished tasks, {window.finished}{" "}
-          finished). Seed {forecast.seed}.{" "}
-          {forecast.workdaysOnly ? "Working days only." : "All calendar days."}{" "}
-          {runs.toLocaleString("en-GB")} simulated futures; the same history and
-          seed always give the same answer.
+          {f.settings(
+            window.from,
+            window.to,
+            window.days,
+            window.daysWithData,
+            window.finished,
+            forecast.seed,
+            forecast.workdaysOnly,
+            runsText,
+          )}
         </p>
-        {bins.length > 0 && (
-          <p className="text-xs text-muted">
-            Each bar is the share of simulated futures (%) that ended with that
-            result; the dashed lines mark 50%, 85% and 95%.
-          </p>
-        )}
+        {bins.length > 0 && <p className="text-xs text-muted">{f.barNote}</p>}
         {bins.length > 0 && (
           <Svg
-            label={`How the simulated futures spread: ${what.toLowerCase()}`}
+            label={f.svg(what.toLowerCase())}
             ticks={ticks}
             y={y}
             xLabels={labelIndexes(bins.length, 6).map((i) => ({
@@ -253,7 +284,9 @@ export function ForecastPanel({
                 height={y(0) - y(share(b.count))}
                 className="fill-primary/70"
               >
-                <title>{`${binLabel(b)}: ${share(b.count).toFixed(1)}% of futures`}</title>
+                <title>
+                  {f.barTitle(binLabel(b), percent(share(b.count)))}
+                </title>
               </rect>
             ))}
             {markers.map((m, i) => (
@@ -268,8 +301,8 @@ export function ForecastPanel({
                 />
                 <text
                   x={M.l + slot * (m.index + 0.5) + 3}
-                  y={M.t + 10 + i * 11}
-                  className="fill-fg text-[10px]"
+                  y={M.t + 12 + i * 13}
+                  className="fill-fg text-[12px]"
                 >
                   {m.percent}%
                 </text>

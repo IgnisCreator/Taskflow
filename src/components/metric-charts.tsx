@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { axis, bandPath, labelIndexes, linear, stack } from "@/lib/charts";
+import { formatNumber } from "@/lib/i18n";
+import type { Catalog } from "@/lib/i18n/en";
 import { METRIC_HELP, type MetricKey } from "@/lib/metric-help";
 import { DAY_MS, type Metrics } from "@/lib/metrics";
-import { CATEGORY_LABEL, type Category } from "@/lib/workflow";
+import type { Category } from "@/lib/workflow";
+import { getT } from "@/server/i18n";
 
 // The charts are plain SVG drawn on the server: no chart library and no script. The geometry comes
 // from `src/lib/charts.ts`; colours are the design tokens. Every chart has a text summary and a
@@ -35,16 +38,13 @@ const FILL: Record<Category, [string, string]> = {
   DISCARDED: ["fill-danger", "fill-danger/60"],
 };
 
-const tasks = (n: number) => (n === 1 ? "1 task" : `${n} tasks`);
-const days = (n: number) => `${n.toFixed(1)} days`;
-
-function bucketName(metrics: PanelMetrics, bucket: string): string {
+function bucketName(t: Catalog, metrics: PanelMetrics, bucket: string): string {
   const stage = metrics.stages?.find((s) => s.id === bucket);
   if (stage) return stage.name;
   const removed = bucket.startsWith("removed:");
   const category = (removed ? bucket.slice(8) : bucket) as Category;
-  const name = CATEGORY_LABEL[category] ?? bucket;
-  return removed ? `Deleted stage (${name.toLowerCase()})` : name;
+  const name = t.categories[category] ?? bucket;
+  return removed ? t.metrics.deletedStage(name.toLowerCase()) : name;
 }
 
 export function Svg({
@@ -103,7 +103,7 @@ export function Svg({
   );
 }
 
-export function Table({
+export async function Table({
   caption,
   head,
   rows,
@@ -112,9 +112,12 @@ export function Table({
   head: string[];
   rows: (string | number)[][];
 }) {
+  const { t } = await getT();
   return (
     <details className="text-sm">
-      <summary className="cursor-pointer text-link">Show the data</summary>
+      <summary className="cursor-pointer text-link">
+        {t.metrics.showData}
+      </summary>
       <div className="mt-2 max-h-72 overflow-auto">
         <table className="w-full text-left">
           <caption className="sr-only">{caption}</caption>
@@ -145,7 +148,7 @@ export function Table({
 }
 
 /** One metric: its name, a sentence with the result, the picture, the data and what it means. */
-export function ChartCard({
+export async function ChartCard({
   metric,
   summary,
   children,
@@ -156,7 +159,8 @@ export function ChartCard({
   children?: ReactNode;
   data?: ReactNode;
 }) {
-  const help = METRIC_HELP[metric];
+  const { t } = await getT();
+  const help = { ...t.metricHelp[metric], url: METRIC_HELP[metric].source.url };
   return (
     // `Expand` is a plain link to this card's id: the :target styles widen it to the whole row.
     <section
@@ -173,13 +177,14 @@ export function ChartCard({
           href={`#card-${metric}`}
           className="link text-sm group-target:hidden"
         >
-          Expand<span className="sr-only"> {help.title}</span>
+          {t.metrics.expand}
+          <span className="sr-only"> {help.title}</span>
         </a>
         <a
           href="#dashboard"
           className="link hidden text-sm group-target:inline"
         >
-          Back to the dashboard
+          {t.metrics.back}
         </a>
       </div>
       <p className="text-sm">{summary}</p>
@@ -189,31 +194,31 @@ export function ChartCard({
         {data}
         <details className="text-sm">
           <summary className="cursor-pointer text-link">
-            What is this and how to read it
+            {t.metrics.whatIs}
           </summary>
           <dl className="mt-2 space-y-2">
             <div>
-              <dt className="font-semibold">What it is</dt>
+              <dt className="font-semibold">{t.metrics.what}</dt>
               <dd className="text-muted">{help.what}</dd>
             </div>
             <div>
-              <dt className="font-semibold">Why it matters</dt>
+              <dt className="font-semibold">{t.metrics.why}</dt>
               <dd className="text-muted">{help.why}</dd>
             </div>
             <div>
-              <dt className="font-semibold">How to read it</dt>
+              <dt className="font-semibold">{t.metrics.read}</dt>
               <dd className="text-muted">{help.read}</dd>
             </div>
             <div>
-              <dt className="font-semibold">Source</dt>
+              <dt className="font-semibold">{t.metrics.source}</dt>
               <dd>
                 <a
-                  href={help.source.url}
+                  href={help.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="link"
                 >
-                  {help.source.label}
+                  {help.sourceLabel}
                 </a>
               </dd>
             </div>
@@ -224,7 +229,9 @@ export function ChartCard({
   );
 }
 
-export function CfdChart({ metrics }: { metrics: PanelMetrics }) {
+export async function CfdChart({ metrics }: { metrics: PanelMetrics }) {
+  const { t } = await getT();
+  const m = t.metrics;
   const { days: dates, series } = metrics.cfd;
   // Done at the bottom, to do on top; what was discarded is not work in the flow.
   const shown = series.filter((s) => s.category !== "DISCARDED").reverse();
@@ -238,7 +245,7 @@ export function CfdChart({ metrics }: { metrics: PanelMetrics }) {
   const bands = shown.map((s, i) => {
     const shade = (seen[s.category] = (seen[s.category] ?? -1) + 1) % 2;
     return {
-      name: bucketName(metrics, s.bucket),
+      name: bucketName(t, metrics, s.bucket),
       path: bandPath(xs, stacked[i]!.lower, stacked[i]!.upper, y),
       className: FILL[s.category][shade]!,
     };
@@ -246,21 +253,29 @@ export function CfdChart({ metrics }: { metrics: PanelMetrics }) {
   const last = dates.length - 1;
   const summary =
     dates.length === 0 || shown.length === 0
-      ? "There is no history in this range yet."
-      : `On ${dates[last]} there were ${tasks(total)} in the flow: ${[...shown]
-          .reverse()
-          .map((s) => `${s.counts[last]} in ${bucketName(metrics, s.bucket)}`)
-          .join(", ")}.`;
+      ? m.cfd.none
+      : m.cfd.summary(
+          dates[last]!,
+          m.tasks(total),
+          [...shown]
+            .reverse()
+            .map((s) =>
+              m.cfd.part(s.counts[last]!, bucketName(t, metrics, s.bucket)),
+            )
+            .join(", "),
+        );
   return (
     <ChartCard
       metric="cfd"
       summary={summary}
       data={
         <Table
-          caption="Tasks per stage at the end of each day"
+          caption={m.cfd.caption}
           head={[
-            "Day",
-            ...[...shown].reverse().map((s) => bucketName(metrics, s.bucket)),
+            m.cfd.day,
+            ...[...shown]
+              .reverse()
+              .map((s) => bucketName(t, metrics, s.bucket)),
           ]}
           rows={dates.map((d, i) => [
             d,
@@ -270,7 +285,7 @@ export function CfdChart({ metrics }: { metrics: PanelMetrics }) {
       }
     >
       <Svg
-        label="Cumulative flow diagram"
+        label={m.cfd.svg}
         ticks={ticks}
         y={y}
         xLabels={labelIndexes(dates.length, 5).map((i) => ({
@@ -332,7 +347,10 @@ export function Line({
   );
 }
 
-export function CycleTimeChart({ metrics }: { metrics: PanelMetrics }) {
+export async function CycleTimeChart({ metrics }: { metrics: PanelMetrics }) {
+  const { lang, t } = await getT();
+  const m = t.metrics;
+  const days = (n: number) => t.units.days(formatNumber(n, lang));
   const { finished, cycleTime: c, leadTime: lead } = metrics;
   const from = Date.parse(metrics.range.from);
   const to = Date.parse(metrics.range.to) + DAY_MS;
@@ -343,27 +361,39 @@ export function CycleTimeChart({ metrics }: { metrics: PanelMetrics }) {
   const dates = labelIndexes(Math.round((to - from) / DAY_MS), 5);
   const summary =
     c.count === 0
-      ? "No task was finished in this range."
-      : `${tasks(c.count)} finished. Half took ${days(c.p50!)} or less, 85% took ${days(c.p85!)} or less and 95% took ${days(c.p95!)} or less. Lead time (from creation): ${days(lead.p50!)} the median, ${days(lead.p85!)} at 85%.`;
+      ? m.cycle.none
+      : m.cycle.summary(
+          m.tasks(c.count),
+          days(c.p50!),
+          days(c.p85!),
+          days(c.p95!),
+          days(lead.p50!),
+          days(lead.p85!),
+        );
   return (
     <ChartCard
       metric="cycleTime"
       summary={summary}
       data={
         <Table
-          caption="Cycle and lead time of each finished task"
-          head={["Task", "Finished", "Cycle time (days)", "Lead time (days)"]}
+          caption={m.cycle.caption}
+          head={[
+            m.cycle.task,
+            m.cycle.finishedOn,
+            m.cycle.cycleDays,
+            m.cycle.leadDays,
+          ]}
           rows={finished.map((f) => [
             metrics.titles[f.id] ?? f.id,
             new Date(f.finishedAt).toISOString().slice(0, 10),
-            f.cycleDays.toFixed(1),
-            f.leadDays.toFixed(1),
+            formatNumber(f.cycleDays, lang),
+            formatNumber(f.leadDays, lang),
           ])}
         />
       }
     >
       <Svg
-        label="Cycle time of each finished task"
+        label={m.cycle.svg}
         ticks={ticks}
         y={y}
         xLabels={dates.map((i) => ({
@@ -385,21 +415,21 @@ export function CycleTimeChart({ metrics }: { metrics: PanelMetrics }) {
         {c.p50 !== null && (
           <Line
             y={y(c.p50)}
-            text={`50%: ${days(c.p50)}`}
+            text={m.cycle.line(50, days(c.p50))}
             className="stroke-control"
           />
         )}
         {c.p85 !== null && (
           <Line
             y={y(c.p85)}
-            text={`85%: ${days(c.p85)}`}
+            text={m.cycle.line(85, days(c.p85))}
             className="stroke-primary"
           />
         )}
         {c.p95 !== null && (
           <Line
             y={y(c.p95)}
-            text={`95%: ${days(c.p95)}`}
+            text={m.cycle.line(95, days(c.p95))}
             className="stroke-danger"
           />
         )}
@@ -408,7 +438,10 @@ export function CycleTimeChart({ metrics }: { metrics: PanelMetrics }) {
   );
 }
 
-export function AgingChart({ metrics }: { metrics: PanelMetrics }) {
+export async function AgingChart({ metrics }: { metrics: PanelMetrics }) {
+  const { lang, t } = await getT();
+  const m = t.metrics;
+  const days = (n: number) => t.units.days(formatNumber(n, lang));
   const { age, cycleTime: c } = metrics;
   const order = [
     ...(metrics.stages?.map((s) => s.id) ?? []),
@@ -424,33 +457,41 @@ export function AgingChart({ metrics }: { metrics: PanelMetrics }) {
   const older = c.p85 === null ? [] : age.filter((a) => a.days > c.p85!);
   const summary =
     age.length === 0
-      ? "Nothing is in progress right now."
-      : `${tasks(age.length)} in progress; the oldest has been going for ${days(Math.max(...age.map((a) => a.days)))}.${c.p85 === null ? "" : older.length === 0 ? ` None is older than the 85th percentile of cycle time (${days(c.p85)}).` : ` ${older.length} older than the 85th percentile of cycle time (${days(c.p85)}).`}`;
+      ? m.aging.none
+      : m.aging.summary(
+          m.tasks(age.length),
+          days(Math.max(...age.map((a) => a.days))),
+        ) +
+        (c.p85 === null
+          ? ""
+          : older.length === 0
+            ? m.aging.noneOlder(days(c.p85))
+            : m.aging.someOlder(older.length, days(c.p85)));
   return (
     <ChartCard
       metric="aging"
       summary={summary}
       data={
         <Table
-          caption="Age of each task in progress"
-          head={["Task", "Stage", "Age (days)"]}
+          caption={m.aging.caption}
+          head={[m.aging.task, m.aging.stage, m.aging.ageDays]}
           rows={[...age]
             .sort((a, b) => b.days - a.days)
             .map((a) => [
               metrics.titles[a.id] ?? a.id,
-              bucketName(metrics, a.bucket),
-              a.days.toFixed(1),
+              bucketName(t, metrics, a.bucket),
+              formatNumber(a.days, lang),
             ])}
         />
       }
     >
       <Svg
-        label="Age of each task in progress, by stage"
+        label={m.aging.svg}
         ticks={ticks}
         y={y}
         xLabels={buckets.map((b, i) => ({
           x: M.l + slot * (i + 0.5),
-          text: bucketName(metrics, b).slice(0, 10),
+          text: bucketName(t, metrics, b).slice(0, 10),
         }))}
       >
         {buckets.map((bucket, i) =>
@@ -475,7 +516,7 @@ export function AgingChart({ metrics }: { metrics: PanelMetrics }) {
         {c.p85 !== null && (
           <Line
             y={y(c.p85)}
-            text={`85% of finished: ${days(c.p85)}`}
+            text={m.aging.line(days(c.p85))}
             className="stroke-primary"
           />
         )}
@@ -484,14 +525,22 @@ export function AgingChart({ metrics }: { metrics: PanelMetrics }) {
   );
 }
 
-export function ThroughputChart({ metrics }: { metrics: PanelMetrics }) {
+export async function ThroughputChart({ metrics }: { metrics: PanelMetrics }) {
+  const { lang, t } = await getT();
+  const m = t.metrics;
   const weeks = metrics.throughput.weekly;
   const { max, ticks } = axis(Math.max(0, ...weeks.map((w) => w.count)));
   const y = linear(0, max, M.t + PLOT_H, M.t);
   const slot = PLOT_W / Math.max(weeks.length, 1);
-  const summary = `${tasks(metrics.throughput.total)} finished between ${metrics.range.from} and ${metrics.range.to}${
+  const summary = `${m.throughput.summary(
+    m.tasks(metrics.throughput.total),
+    metrics.range.from,
+    metrics.range.to,
+  )}${
     weeks.length > 0
-      ? `, ${(metrics.throughput.total / weeks.length).toFixed(1)} per week on average`
+      ? m.throughput.perWeek(
+          formatNumber(metrics.throughput.total / weeks.length, lang),
+        )
       : ""
   }.`;
   return (
@@ -500,14 +549,14 @@ export function ThroughputChart({ metrics }: { metrics: PanelMetrics }) {
       summary={summary}
       data={
         <Table
-          caption="Tasks finished per week"
-          head={["Week starting (Monday)", "Finished"]}
+          caption={m.throughput.caption}
+          head={[m.throughput.week, m.throughput.finished]}
           rows={weeks.map((w) => [w.weekStart, w.count])}
         />
       }
     >
       <Svg
-        label="Tasks finished per week"
+        label={m.throughput.svg}
         ticks={ticks}
         y={y}
         xLabels={labelIndexes(weeks.length, 6).map((i) => ({
@@ -524,7 +573,7 @@ export function ThroughputChart({ metrics }: { metrics: PanelMetrics }) {
             height={y(0) - y(w.count)}
             className="fill-primary"
           >
-            <title>{`Week of ${w.weekStart}: ${w.count}`}</title>
+            <title>{m.throughput.bar(w.weekStart, w.count)}</title>
           </rect>
         ))}
       </Svg>
@@ -532,7 +581,9 @@ export function ThroughputChart({ metrics }: { metrics: PanelMetrics }) {
   );
 }
 
-export function WipPanel({ metrics }: { metrics: PanelMetrics }) {
+export async function WipPanel({ metrics }: { metrics: PanelMetrics }) {
+  const { t } = await getT();
+  const m = t.metrics;
   const count = (bucket: string) =>
     metrics.wip.current.find((c) => c.bucket === bucket)?.count ?? 0;
   // A list: every active or waiting stage, even if empty, with its limit. A space: the categories.
@@ -543,16 +594,16 @@ export function WipPanel({ metrics }: { metrics: PanelMetrics }) {
     : metrics.wip.current
         .filter((c) => c.category === "ACTIVE" || c.category === "WAITING")
         .map((c) => ({
-          name: bucketName(metrics, c.bucket),
+          name: bucketName(t, metrics, c.bucket),
           count: c.count,
           limit: null,
         }));
   return (
     <ChartCard
       metric="wip"
-      summary={`${tasks(metrics.wip.total)} in progress now.${
+      summary={`${m.wip.summary(m.tasks(metrics.wip.total))}${
         rows.some((r) => r.limit !== null && r.count > r.limit)
-          ? " At least one stage is over its limit."
+          ? m.wip.over
           : ""
       }`}
     >
@@ -568,8 +619,8 @@ export function WipPanel({ metrics }: { metrics: PanelMetrics }) {
                 <span className="truncate">{r.name}</span>
                 <span className={over ? "font-semibold text-danger-text" : ""}>
                   {r.count}
-                  {r.limit !== null && ` of ${r.limit}`}
-                  {over && " (over the limit)"}
+                  {r.limit !== null && m.wip.of(r.limit)}
+                  {over && m.wip.overLimit}
                 </span>
               </li>
             );
@@ -580,15 +631,24 @@ export function WipPanel({ metrics }: { metrics: PanelMetrics }) {
   );
 }
 
-export function EfficiencyCard({ metrics }: { metrics: PanelMetrics }) {
+export async function EfficiencyCard({ metrics }: { metrics: PanelMetrics }) {
+  const { lang, t } = await getT();
+  const m = t.metrics;
   const e = metrics.flowEfficiency;
+  const n = (value: number) => formatNumber(value, lang);
   return (
     <ChartCard
       metric="efficiency"
       summary={
         e.ratio === null
-          ? "No task was finished in this range."
-          : `${Math.round(e.ratio * 100)}% of the in-progress time of finished tasks was active work (${e.activeDays.toFixed(1)} days active, ${e.waitingDays.toFixed(1)} waiting, ${e.blockedDays.toFixed(1)} of them blocked). Reopened in this range: ${metrics.reopened}.`
+          ? m.efficiency.none
+          : m.efficiency.summary(
+              Math.round(e.ratio * 100),
+              n(e.activeDays),
+              n(e.waitingDays),
+              n(e.blockedDays),
+              metrics.reopened,
+            )
       }
     />
   );

@@ -397,6 +397,8 @@ model Notification {
   kind       AlertKind
   key        String
   message    String
+  /// What the alert says as data (see `describeAlert`); null for the ones made before it existed.
+  params     Json?
   createdAt  DateTime  @default(now())
   readAt     DateTime?
   resolvedAt DateTime?

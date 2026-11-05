@@ -129,6 +129,7 @@ async function reconcile(tx: Tx, list: ListToCheck, now: number) {
       kind: alert.kind,
       key: alert.key,
       message: alert.message,
+      params: alert.params,
       createdAt: new Date(now),
     })),
   });

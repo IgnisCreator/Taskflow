@@ -7,6 +7,7 @@ import {
   readJson,
   requireUser,
 } from "@/server/http";
+import { getLang } from "@/server/i18n";
 import { createWorkspace, listWorkspaces } from "@/server/services/workspaces";
 
 export const GET = handle(async () => {
@@ -19,5 +20,5 @@ export const POST = handle(async (request: Request) => {
   const user = await requireUser();
   assertNotDemo(user);
   const { name } = await readJson(request, createWorkspaceSchema);
-  return json(await createWorkspace(user.id, name), 201);
+  return json(await createWorkspace(user.id, name, await getLang()), 201);
 });

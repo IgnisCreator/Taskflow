@@ -1,7 +1,7 @@
 import "server-only";
+import { en } from "@/lib/i18n/en";
 import {
-  MIN_DAYS_WITH_DATA,
-  MIN_FINISHED,
+  forecastWarnings,
   PERCENTILES,
   RUNS,
   atLeast,
@@ -48,17 +48,12 @@ export async function getListForecast(
     daysWithData: daily.filter((d) => d.count > 0).length,
     finished: metrics.throughput.total,
   };
-  const warnings: string[] = [];
-  if (history.daysWithData < MIN_DAYS_WITH_DATA) {
-    warnings.push(
-      `Only ${history.daysWithData} days in this window had finished tasks (fewer than ${MIN_DAYS_WITH_DATA}): treat the forecast as a rough guide.`,
-    );
-  }
-  if (history.finished < MIN_FINISHED) {
-    warnings.push(
-      `Only ${history.finished} tasks were finished in this window (fewer than ${MIN_FINISHED}): there is little pace to learn from.`,
-    );
-  }
+  // The API says it in English; the page writes the same warnings in its own language.
+  const warnings = forecastWarnings(history).map((w) =>
+    w.code === "FEW_DAYS"
+      ? en.forecast.warnings.fewDays(w.have, w.need)
+      : en.forecast.warnings.fewTasks(w.have, w.need),
+  );
   // Without any finished task in the samples there is nothing to replay.
   const possible = samples.some((count) => count > 0);
   const common = {

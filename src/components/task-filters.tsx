@@ -28,7 +28,8 @@ export async function TaskFilters({
   sort: Sort;
   dir: Dir;
 }) {
-  const m = (await getT()).t.filters;
+  const { t } = await getT();
+  const m = t.filters;
   // What "Clear" goes back to: no filters, same view and sort.
   const keep = new URLSearchParams({ view, sort, dir }).toString();
   return (
@@ -75,9 +76,9 @@ export async function TaskFilters({
           className="input"
         >
           <option value="">{m.anyPriority}</option>
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
+          <option value="HIGH">{t.priorities.HIGH}</option>
+          <option value="MEDIUM">{t.priorities.MEDIUM}</option>
+          <option value="LOW">{t.priorities.LOW}</option>
         </select>
       </label>
       <label className="field">
