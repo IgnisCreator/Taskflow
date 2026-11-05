@@ -22,6 +22,33 @@ export const DEFAULT_WINDOW_DAYS = 90;
 export const MIN_DAYS_WITH_DATA = 10;
 export const MIN_FINISHED = 5;
 
+export type ForecastWarning =
+  | { code: "FEW_DAYS"; have: number; need: number }
+  | { code: "FEW_TASKS"; have: number; need: number };
+
+/** What is thin in the history window of a forecast (nothing when there is enough to learn from). */
+export function forecastWarnings(window: {
+  daysWithData: number;
+  finished: number;
+}): ForecastWarning[] {
+  const warnings: ForecastWarning[] = [];
+  if (window.daysWithData < MIN_DAYS_WITH_DATA) {
+    warnings.push({
+      code: "FEW_DAYS",
+      have: window.daysWithData,
+      need: MIN_DAYS_WITH_DATA,
+    });
+  }
+  if (window.finished < MIN_FINISHED) {
+    warnings.push({
+      code: "FEW_TASKS",
+      have: window.finished,
+      need: MIN_FINISHED,
+    });
+  }
+  return warnings;
+}
+
 /** A small seedable generator (mulberry32): numbers in [0, 1). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

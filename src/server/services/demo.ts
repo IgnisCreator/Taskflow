@@ -9,6 +9,8 @@ import {
   type DemoTask,
 } from "@/lib/demo-data";
 import { DAY_MS } from "@/lib/metrics";
+import { catalogs, type Lang } from "@/lib/i18n";
+import { localizeTemplate } from "@/lib/i18n/templates";
 import { SYSTEM_TEMPLATES } from "@/lib/workflow";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
@@ -24,7 +26,6 @@ export const DEMO_DOMAIN = "demo.taskflow.test";
 export const SANDBOX_HOURS = 24;
 /** Sandboxes alive at once; more visitors than this are asked to come back later. */
 export const MAX_SANDBOXES = 150;
-const DEMO_WORKSPACE = "Acme Product Team";
 const HOUR_MS = 3_600_000;
 
 /** The demo is off unless the deployment turns it on. */
@@ -78,17 +79,26 @@ const taskRow = (
   createdAt: new Date(task.createdAt),
 });
 
-/** The sample workspace, owned by `ownerId`, with a history that ends yesterday. */
+/**
+ * The sample workspace, owned by `ownerId`, with a history that ends yesterday. Its names and words
+ * come in `lang`; the simulation keys everything by the English names, so those are mapped by position.
+ */
 async function buildWorkspace(
   tx: Tx,
   ownerId: string,
   people: Map<number, string>,
   now: number,
+  lang: Lang,
 ) {
-  const lists = generateDemo(Math.floor(now / DAY_MS) * DAY_MS);
+  const text = catalogs[lang];
+  const lists = generateDemo(
+    Math.floor(now / DAY_MS) * DAY_MS,
+    undefined,
+    lang,
+  );
   const workspace = await tx.workspace.create({
     data: {
-      name: DEMO_WORKSPACE,
+      name: text.sample.workspace,
       members: {
         create: [
           { userId: ownerId, role: "OWNER" as const },
@@ -98,8 +108,8 @@ async function buildWorkspace(
           })),
         ],
       },
-      types: { create: DEFAULT_TYPES.map((name) => ({ name })) },
-      labels: { create: DEMO_LABELS.map((name) => ({ name })) },
+      types: { create: text.defaults.types.map((name) => ({ name })) },
+      labels: { create: text.sample.labels.map((name) => ({ name })) },
     },
     select: {
       id: true,
@@ -107,8 +117,21 @@ async function buildWorkspace(
       labels: { select: { id: true, name: true } },
     },
   });
-  const typeId = new Map(workspace.types.map((t) => [t.name, t.id]));
-  const labelId = new Map(workspace.labels.map((l) => [l.name, l.id]));
+  // The simulation says "Bug" and "urgent"; the workspace has them in `lang`, in the same order.
+  const typeByName = new Map(workspace.types.map((t) => [t.name, t.id]));
+  const typeId = new Map(
+    DEFAULT_TYPES.map((name, i) => [
+      name,
+      typeByName.get(text.defaults.types[i]!),
+    ]),
+  );
+  const labelByName = new Map(workspace.labels.map((l) => [l.name, l.id]));
+  const labelId = new Map(
+    DEMO_LABELS.map((name, i) => [
+      name,
+      labelByName.get(text.sample.labels[i]!),
+    ]),
+  );
   const guests = DEMO_PEOPLE.flatMap((p, i) =>
     p.role === "GUEST" ? [people.get(i)!] : [],
   );
@@ -119,7 +142,10 @@ async function buildWorkspace(
   for (const list of lists) {
     if (!spaces.has(list.space)) {
       const space = await tx.space.create({
-        data: { workspaceId: workspace.id, name: list.space },
+        data: {
+          workspaceId: workspace.id,
+          name: text.sample.spaces[list.space as "Software" | "Support"],
+        },
         select: { id: true },
       });
       // A guest sees only the spaces they are listed in.
@@ -135,27 +161,35 @@ async function buildWorkspace(
       spaces.set(list.space, space.id);
     }
     const template = SYSTEM_TEMPLATES[list.template]!;
+    const named = localizeTemplate(list.template, template, lang);
     const created = await tx.list.create({
       data: {
-        name: list.name,
+        name: text.sample.lists[list.name as "Platform" | "Customer requests"],
         spaceId: spaces.get(list.space)!,
         columns: {
-          create: template.stages.map((stage, position) => ({
+          create: named.stages.map((stage, position) => ({
             name: stage.name,
             position,
             category: stage.category,
             isCommitmentPoint: stage.isCommitmentPoint,
-            wipLimit: list.wipLimits[stage.name] ?? stage.wipLimit,
+            wipLimit:
+              list.wipLimits[template.stages[position]!.name] ?? stage.wipLimit,
             policy: stage.policy,
           })),
         },
       },
       select: {
         id: true,
-        columns: { select: { id: true, name: true, category: true } },
+        columns: {
+          orderBy: { position: "asc" },
+          select: { id: true, name: true, category: true },
+        },
       },
     });
-    const column = new Map(created.columns.map((c) => [c.name, c]));
+    // The history names the English stages: they are the same columns, in the same order.
+    const column = new Map(
+      template.stages.map((s, i) => [s.name, created.columns[i]!]),
+    );
     const positions = new Map<string, number>();
 
     const rows = list.tasks.map((task) => {
@@ -214,7 +248,7 @@ async function buildWorkspace(
 const TX = { timeout: 60_000, maxWait: 10_000 };
 
 /** A new sandbox: the temporary user and its workspace, with the alerts of its lists already raised. */
-export async function createSandbox(now = Date.now()) {
+export async function createSandbox(now = Date.now(), lang: Lang = "en") {
   const people = await ensureTeammates();
   const id = `sandbox-${randomUUID()}`;
   const email = `${id}@${DEMO_DOMAIN}`;
@@ -239,14 +273,18 @@ export async function createSandbox(now = Date.now()) {
         password: hash,
       },
     });
-    return buildWorkspace(tx, id, people, now);
+    return buildWorkspace(tx, id, people, now, lang);
   }, TX);
   await runAlerts(now, built.workspaceId);
   return { userId: id, email, password, ...built };
 }
 
 /** The visitor's workspace is replaced by a fresh one; the user and the deadline stay. */
-export async function restartSandbox(userId: string, now = Date.now()) {
+export async function restartSandbox(
+  userId: string,
+  now = Date.now(),
+  lang: Lang = "en",
+) {
   const people = await ensureTeammates();
   const built = await db.$transaction(async (tx) => {
     const owner = await tx.user.findFirst({
@@ -257,7 +295,7 @@ export async function restartSandbox(userId: string, now = Date.now()) {
     await tx.workspace.deleteMany({
       where: { members: { some: { userId, role: "OWNER" } } },
     });
-    return buildWorkspace(tx, userId, people, now);
+    return buildWorkspace(tx, userId, people, now, lang);
   }, TX);
   if (built) await runAlerts(now, built.workspaceId);
   return built;

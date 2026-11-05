@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/server/auth";
+import { getLang } from "@/server/i18n";
 import { DEMO_LIMIT, clientAddress, rateLimit } from "@/server/rate-limit";
 import {
   MAX_SANDBOXES,
@@ -37,7 +38,7 @@ export async function startDemo() {
   if (!(await withinLimit())) redirect("/?demo=limit");
   await purgeSandboxes(Date.now(), 20);
   if ((await aliveSandboxes()) >= MAX_SANDBOXES) redirect("/?demo=busy");
-  const sandbox = await createSandbox();
+  const sandbox = await createSandbox(Date.now(), await getLang());
   await auth.api.signInEmail({
     body: { email: sandbox.email, password: sandbox.password },
     headers: await headers(),
@@ -51,7 +52,7 @@ export async function restartDemo() {
   const user = await getCurrentUser();
   if (!user?.sandboxUntil) redirect("/");
   if (!(await withinLimit())) redirect("/?demo=limit");
-  const built = await restartSandbox(user.id);
+  const built = await restartSandbox(user.id, Date.now(), await getLang());
   redirect(built ? `/w/${built.workspaceId}` : "/");
 }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ApiForm } from "@/components/api-form";
+import { notificationText } from "@/lib/alerts";
 import { formatDateTime } from "@/lib/i18n";
 import { getT } from "@/server/i18n";
 import { loadUser } from "@/server/load";
@@ -35,7 +36,9 @@ export default async function NotificationsPage() {
             key={n.id}
             className={`card space-y-2 ${n.readAt ? "" : "border-primary"}`}
           >
-            <p className={n.readAt ? "" : "font-semibold"}>{n.message}</p>
+            <p className={n.readAt ? "" : "font-semibold"}>
+              {notificationText(n, lang)}
+            </p>
             <p className="flex flex-wrap items-center gap-3 text-sm text-muted">
               <Link href={`/lists/${n.listId}/metrics`} className="link">
                 {t.notifications.seeMetrics(n.listName)}
@@ -62,7 +65,7 @@ export default async function NotificationsPage() {
           <ul className="space-y-2 text-sm text-muted">
             {resolved.map((n) => (
               <li key={n.id} className="card p-3">
-                {n.listName}: {n.message}
+                {n.listName}: {notificationText(n, lang)}
               </li>
             ))}
           </ul>

@@ -9,6 +9,7 @@
 // - THROUGHPUT_DROP: the last complete week finished `dropPercent`% less than the average of the four
 //   weeks before it (only when that average is at least one task a week).
 
+import { catalogs, formatNumber, type Lang } from "@/lib/i18n";
 import type { Metrics } from "@/lib/metrics";
 import type { Category } from "@/lib/workflow";
 
@@ -34,14 +35,91 @@ export const ALERT_WINDOW_DAYS = 90;
 export type AlertKind =
   "WIP_OVER_LIMIT" | "BAND_WIDENING" | "TASK_AGING" | "THROUGHPUT_DROP";
 
-export type Alert = {
-  kind: AlertKind;
-  /** Stable while the condition holds: the same key is never notified twice. */
-  key: string;
-  stageId?: string;
-  taskId?: string;
-  message: string;
+/** What each alert says, as data: the reader's language turns it into a sentence. */
+export type AlertParamsOf = {
+  WIP_OVER_LIMIT: {
+    stage: string;
+    days: number;
+    count: number;
+    limit: number;
+  };
+  BAND_WIDENING: { stage: string; from: number; to: number; days: number };
+  TASK_AGING: { title: string | null; days: number; p85: number };
+  THROUGHPUT_DROP: {
+    week: string;
+    count: number;
+    average: number;
+    percent: number;
+  };
 };
+
+export type Alert = {
+  [K in AlertKind]: {
+    kind: K;
+    /** Stable while the condition holds: the same key is never notified twice. */
+    key: string;
+    stageId?: string;
+    taskId?: string;
+    params: AlertParamsOf[K];
+    /** The sentence in English (the daily email and old notifications use it). */
+    message: string;
+  };
+}[AlertKind];
+
+/** The alert as a sentence in `lang`. */
+export function describeAlert<K extends AlertKind>(
+  kind: K,
+  params: AlertParamsOf[K],
+  lang: Lang,
+): string {
+  const t = catalogs[lang].alerts;
+  const n = (value: number) => formatNumber(value, lang);
+  switch (kind as AlertKind) {
+    case "WIP_OVER_LIMIT": {
+      const p = params as AlertParamsOf["WIP_OVER_LIMIT"];
+      return t.wipOverLimit(p.stage, p.days, p.count, p.limit);
+    }
+    case "BAND_WIDENING": {
+      const p = params as AlertParamsOf["BAND_WIDENING"];
+      return t.bandWidening(p.stage, p.from, p.to, p.days);
+    }
+    case "TASK_AGING": {
+      const p = params as AlertParamsOf["TASK_AGING"];
+      return t.taskAging(p.title ?? t.aTask, n(p.days), n(p.p85));
+    }
+    case "THROUGHPUT_DROP": {
+      const p = params as AlertParamsOf["THROUGHPUT_DROP"];
+      return t.throughputDrop(p.week, p.count, n(p.average), p.percent);
+    }
+  }
+}
+
+/**
+ * What a stored notification says in `lang`: made from its data, or its English sentence when it
+ * was stored before the data was (`params` is null).
+ */
+export function notificationText(
+  n: { kind: AlertKind; message: string; params: unknown },
+  lang: Lang,
+): string {
+  return n.params ? describeAlert(n.kind, n.params as never, lang) : n.message;
+}
+
+/** An alert with its English sentence made from its data. */
+function alert<K extends AlertKind>(
+  kind: K,
+  key: string,
+  params: AlertParamsOf[K],
+  ids: { stageId?: string; taskId?: string } = {},
+): Alert {
+  return {
+    kind,
+    key,
+    ...ids,
+    params,
+    message: describeAlert(kind, params, "en"),
+  } as Alert;
+}
 
 type Stage = {
   id: string;
@@ -74,12 +152,19 @@ export function detectAlerts(
       )
         run++;
       if (run >= settings.wipDays) {
-        alerts.push({
-          kind: "WIP_OVER_LIMIT",
-          key: `wip:${stage.id}`,
-          stageId: stage.id,
-          message: `"${stage.name}" has been over its WIP limit for ${run} days (${counts.at(-1)} of ${stage.wipLimit}). Finish something before pulling more in.`,
-        });
+        alerts.push(
+          alert(
+            "WIP_OVER_LIMIT",
+            `wip:${stage.id}`,
+            {
+              stage: stage.name,
+              days: run,
+              count: counts.at(-1)!,
+              limit: stage.wipLimit,
+            },
+            { stageId: stage.id },
+          ),
+        );
       }
     }
 
@@ -89,12 +174,19 @@ export function detectAlerts(
         (c, i) => i === 0 || c >= recent[i - 1]!,
       );
       if (neverShrinks && recent.at(-1)! - recent[0]! >= 2) {
-        alerts.push({
-          kind: "BAND_WIDENING",
-          key: `band:${stage.id}`,
-          stageId: stage.id,
-          message: `"${stage.name}" has grown from ${recent[0]} to ${recent.at(-1)} tasks in ${settings.bandDays} days without shrinking: work is arriving faster than it leaves.`,
-        });
+        alerts.push(
+          alert(
+            "BAND_WIDENING",
+            `band:${stage.id}`,
+            {
+              stage: stage.name,
+              from: recent[0]!,
+              to: recent.at(-1)!,
+              days: settings.bandDays,
+            },
+            { stageId: stage.id },
+          ),
+        );
       }
     }
   }
@@ -103,12 +195,18 @@ export function detectAlerts(
   if (cycleTime.p85 !== null && cycleTime.count >= MIN_FINISHED) {
     for (const task of metrics.age) {
       if (task.days <= cycleTime.p85) continue;
-      alerts.push({
-        kind: "TASK_AGING",
-        key: `age:${task.id}`,
-        taskId: task.id,
-        message: `"${metrics.titles[task.id] ?? "A task"}" has been in progress for ${task.days.toFixed(1)} days, longer than 85% of finished tasks (${cycleTime.p85.toFixed(1)} days).`,
-      });
+      alerts.push(
+        alert(
+          "TASK_AGING",
+          `age:${task.id}`,
+          {
+            title: metrics.titles[task.id] ?? null,
+            days: task.days,
+            p85: cycleTime.p85,
+          },
+          { taskId: task.id },
+        ),
+      );
     }
   }
 
@@ -122,11 +220,14 @@ export function detectAlerts(
       average >= 1 &&
       last.count <= average * (1 - settings.dropPercent / 100)
     ) {
-      alerts.push({
-        kind: "THROUGHPUT_DROP",
-        key: "drop",
-        message: `The week of ${last.weekStart} finished ${last.count} tasks, against ${average.toFixed(1)} a week on average before: a drop of ${Math.round((1 - last.count / average) * 100)}%.`,
-      });
+      alerts.push(
+        alert("THROUGHPUT_DROP", "drop", {
+          week: last.weekStart,
+          count: last.count,
+          average,
+          percent: Math.round((1 - last.count / average) * 100),
+        }),
+      );
     }
   }
 

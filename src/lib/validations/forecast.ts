@@ -99,6 +99,7 @@ export function parseForecastQuery(
 export function parseForecastPageQuery(
   params: Record<string, string | string[] | undefined>,
   now: number,
+  translate: (message: string) => string = (message) => message,
 ): { query: ForecastQuery; error: string | null } {
   // A form sends the fields it leaves empty as "": they mean "not set".
   const set = Object.fromEntries(
@@ -110,7 +111,7 @@ export function parseForecastPageQuery(
     if (!(error instanceof z.ZodError)) throw error;
     return {
       query: parseForecastQuery({}, now),
-      error: error.issues.map((issue) => issue.message).join(". "),
+      error: error.issues.map((issue) => translate(issue.message)).join(". "),
     };
   }
 }

@@ -117,6 +117,11 @@ export async function seedBoard() {
 }
 
 export async function cleanup() {
+  // Demo sandboxes first: their workspaces, then their users.
+  await prisma.workspace.deleteMany({
+    where: { members: { some: { user: { sandboxUntil: { not: null } } } } },
+  });
+  await prisma.user.deleteMany({ where: { sandboxUntil: { not: null } } });
   await prisma.workspace.deleteMany({
     where: {
       members: {

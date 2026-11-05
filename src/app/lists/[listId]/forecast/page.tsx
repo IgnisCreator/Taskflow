@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ForecastPanel } from "@/components/forecast-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { parseForecastPageQuery } from "@/lib/validations/forecast";
+import { translateQueryError } from "@/lib/validations/query-errors";
+import { getT } from "@/server/i18n";
 import { limitForecast } from "@/server/http";
 import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { getListForecast } from "@/server/services/forecast";
@@ -18,13 +20,16 @@ export default async function ListForecastPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await loadUser();
+  const { t } = await getT();
   const { listId } = await params;
   const list = await getList(user.id, listId);
   if (!list) notFound();
   await limitForecast(user.id, await headers());
   const raw = await searchParams;
   const now = currentTime();
-  const { query, error } = parseForecastPageQuery(raw, now);
+  const { query, error } = parseForecastPageQuery(raw, now, (message) =>
+    translateQueryError(message, t),
+  );
   const [workspace, forecast] = await Promise.all([
     loadWorkspace(user.id, list.workspaceId),
     getListForecast(user.id, listId, query, now),
@@ -45,12 +50,10 @@ export default async function ListForecastPage({
             &larr; {list.name}
           </Link>
         </p>
-        <h1 className="text-2xl font-semibold">Forecast of {list.name}</h1>
-        <p className="text-muted">
-          A Monte Carlo simulation over the pace of this list: it replays the
-          days of the history window at random, thousands of times, and says how
-          likely each outcome is.
-        </p>
+        <h1 className="text-2xl font-semibold">
+          {t.forecast.title(list.name)}
+        </h1>
+        <p className="text-muted">{t.forecast.intro}</p>
         <ForecastPanel
           forecast={forecast}
           basePath={`/lists/${list.id}/forecast`}

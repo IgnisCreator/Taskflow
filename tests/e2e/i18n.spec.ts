@@ -86,6 +86,9 @@ test.describe("a visitor whose browser asks for Spanish", () => {
       `/lists/${seed.listId}/flow`,
       `/lists/${seed.listId}/settings`,
       `/lists/${seed.listId}/activity`,
+      `/lists/${seed.listId}/metrics`,
+      `/spaces/${seed.spaceId}/metrics`,
+      `/lists/${seed.listId}/forecast`,
     ]) {
       await page.goto(path);
       await checkPage(path);
@@ -106,5 +109,75 @@ test.describe("a visitor whose browser asks for Spanish", () => {
     await expect(
       page.getByRole("heading", { name: es.login.title }),
     ).toBeVisible();
+
+    test("the demo opens in Spanish, with its data, charts and alerts", async ({
+      page,
+    }) => {
+      const leaves = (value: unknown): string[] =>
+        typeof value === "string"
+          ? [value]
+          : value && typeof value === "object"
+            ? Object.values(value).flatMap(leaves)
+            : [];
+      const spanishAll = new Set(leaves(es));
+      const english = leaves(en).filter(
+        (text) => text.length >= 14 && !spanishAll.has(text),
+      );
+      const noEnglish = async (label: string) => {
+        const text = (await page.locator("body").innerText()).replace(
+          /\s+/g,
+          " ",
+        );
+        for (const sentence of english) {
+          expect(text, `${label}: ${sentence}`).not.toContain(sentence);
+        }
+      };
+
+      await page.goto("/");
+      await page.getByRole("button", { name: es.demo.explore }).click();
+      await expect(page).toHaveURL(/\/w\/[\w-]+$/);
+      await expect(
+        page.getByRole("heading", { name: es.sample.workspace }),
+      ).toBeVisible();
+      await expect(page.getByRole("note")).toContainText(
+        "espacio de demostración",
+      );
+      await noEnglish("the workspace");
+
+      await page
+        .getByRole("link", { name: es.sample.lists.Platform, exact: true })
+        .first()
+        .click();
+      await expect(page).toHaveURL(/\/lists\/[\w-]+$/);
+      await expect(page.getByText("Revisión de código").first()).toBeVisible();
+      await expect(
+        page.getByText(/Por encima del límite de WIP/).first(),
+      ).toBeVisible();
+      await noEnglish("the board");
+      const board = page.url();
+
+      await page.goto(`${board}/metrics`);
+      await expect(page.locator('[data-metric="cycleTime"]')).toContainText(
+        /\d+ tareas terminadas\. La mitad tardó/,
+      );
+      await expect(page.locator('[data-metric="aging"]')).toContainText(
+        /más antiguas que el percentil 85/,
+      );
+      await noEnglish("the metrics");
+
+      await page.goto(`${board}/forecast`);
+      await expect(page.locator('[data-metric="forecast"]')).toContainText(
+        "de probabilidad",
+      );
+      await noEnglish("the forecast");
+
+      await page.goto("/notifications");
+      await expect(
+        page.getByText(
+          /"Revisión de código" lleva \d+ días por encima de su límite de WIP/,
+        ),
+      ).toBeVisible();
+      await noEnglish("the alerts");
+    });
   });
 });

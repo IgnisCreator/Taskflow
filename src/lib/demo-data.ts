@@ -8,6 +8,8 @@
 // done, some are discarded. Everything happens on weekdays and ends yesterday.
 
 import { mulberry32 } from "@/lib/forecast";
+import { catalogs, type Lang } from "@/lib/i18n";
+import type { Catalog } from "@/lib/i18n/en";
 import { DAY_MS } from "@/lib/metrics";
 
 export const DEMO_SEED = 20261028;
@@ -92,70 +94,8 @@ type Flow = {
   steps: Step[];
   wipLimits: Record<string, number>;
   types: [string, number][];
-  titles: (pick: Pick) => string;
+  titles: (pick: Pick, text: Catalog["sample"]) => string;
 };
-
-const VERBS = [
-  "Fix",
-  "Add",
-  "Refactor",
-  "Improve",
-  "Document",
-  "Migrate",
-  "Optimise",
-  "Test",
-  "Remove",
-  "Review",
-];
-const AREAS = [
-  "login redirect",
-  "search filters",
-  "payment webhook",
-  "invoice export",
-  "avatar upload",
-  "rate limiter",
-  "notification settings",
-  "dashboard widgets",
-  "CSV import",
-  "audit log",
-  "password reset",
-  "session timeout",
-  "onboarding checklist",
-  "API pagination",
-  "email templates",
-  "dark theme colours",
-  "cache invalidation",
-  "report scheduler",
-];
-const ISSUES = [
-  "Cannot log in",
-  "Invoice shows the wrong total",
-  "Export fails with a timeout",
-  "Request: bulk edit",
-  "Question about permissions",
-  "Email notifications are late",
-  "Cannot reset the password",
-  "Data missing after import",
-  "Question about webhooks",
-  "Billing address change",
-  "Dashboard is slow",
-  "Account deletion request",
-];
-const COMPANIES = [
-  "Acme",
-  "Globex",
-  "Initech",
-  "Umbrella",
-  "Hooli",
-  "Stark",
-  "Wayne",
-];
-const BLOCKS = [
-  "Waiting for API credentials from the vendor",
-  "Needs a decision from product",
-  "The test environment is down",
-  "Waiting for the design review",
-];
 
 const FLOWS: Flow[] = [
   {
@@ -170,7 +110,7 @@ const FLOWS: Flow[] = [
       ["Task", 25],
       ["Request", 5],
     ],
-    titles: (pick) => `${pick(VERBS)} ${pick(AREAS)}`,
+    titles: (pick, text) => `${pick(text.verbs)} ${pick(text.areas)}`,
     steps: [
       { stage: "Backlog", dwell: [1, 3] },
       { stage: "Ready", hold: true },
@@ -199,7 +139,7 @@ const FLOWS: Flow[] = [
       ["Bug", 25],
       ["Task", 15],
     ],
-    titles: (pick) => `${pick(ISSUES)} - ${pick(COMPANIES)}`,
+    titles: (pick, text) => `${pick(text.issues)} - ${pick(text.companies)}`,
     steps: [
       { stage: "New", dwell: [1, 1] },
       { stage: "Triage", hold: true },
@@ -237,6 +177,7 @@ function simulate(
   flow: Flow,
   days: number[],
   random: () => number,
+  text: Catalog["sample"],
 ): DemoTask[] {
   const n = days.length;
   const int = (lo: number, hi: number) =>
@@ -284,7 +225,7 @@ function simulate(
       // A task that will be discarded soon is not also blocked: its history stays in order.
       if (item.fate !== "discard-work" && chance(step.pull.block)) {
         const length = int(1, 3);
-        const reason = pick(BLOCKS);
+        const reason = pick(text.blocks);
         schedule(day + 1, () => {
           log(item, day + 1, "BLOCKED", step.stage, step.stage);
           item.task.blockedReason = reason;
@@ -364,7 +305,7 @@ function simulate(
     for (let k = 0; k < count; k++) {
       const roll = random();
       const task: DemoTask = {
-        title: flow.titles(pick),
+        title: flow.titles(pick, text),
         type: weighted(flow.types, random()),
         priority: roll < 0.2 ? "HIGH" : roll < 0.75 ? "MEDIUM" : "LOW",
         assignees: [],
@@ -418,7 +359,16 @@ function weighted(options: [string, number][], roll: number): string {
 }
 
 /** The whole demo: the lists with their tasks and histories, ending yesterday (`today` is midnight UTC). */
-export function generateDemo(today: number, seed = DEMO_SEED): DemoList[] {
+/**
+ * The whole demo. The words (titles, blocking reasons) come in `lang`; the lists have the same
+ * length in every language, so the same seed gives the same history whatever the language.
+ */
+export function generateDemo(
+  today: number,
+  seed = DEMO_SEED,
+  lang: Lang = "en",
+): DemoList[] {
+  const text = catalogs[lang].sample;
   const random = mulberry32(seed);
   const days = weekdays(today);
   return FLOWS.map((flow) => ({
@@ -426,6 +376,6 @@ export function generateDemo(today: number, seed = DEMO_SEED): DemoList[] {
     space: flow.space,
     template: flow.template,
     wipLimits: flow.wipLimits,
-    tasks: simulate(flow, days, random),
+    tasks: simulate(flow, days, random, text),
   }));
 }

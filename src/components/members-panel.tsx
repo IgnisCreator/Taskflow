@@ -6,7 +6,7 @@ import { ApiForm } from "@/components/api-form";
 import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import { roleLabel } from "@/lib/roles";
-import type { Role } from "@/lib/validations/workspaces";
+import { MAX_MEMBERS, type Role } from "@/lib/validations/workspaces";
 import { canManageMember, type Actor } from "@/server/policies";
 
 type Member = { userId: string; name: string; role: Role };
@@ -44,7 +44,8 @@ export function MembersPanel({
   return (
     <section className="card space-y-4">
       <h2 className="text-lg font-semibold">
-        {t.members.title} <span className="badge">{members.length} / 20</span>
+        {t.members.title}{" "}
+        <span className="badge">{`${members.length} / ${MAX_MEMBERS}`}</span>
       </h2>
       <ul className="divide-y divide-line">
         {members.map((member) => (

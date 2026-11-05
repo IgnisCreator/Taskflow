@@ -1,3 +1,5 @@
+import { METRIC_HELP, type MetricKey } from "@/lib/metric-help";
+
 // The wording of the interface, in English: the source of truth. `es.ts` must have the same shape
 // (it is typed as `Catalog`), so a key missing from one language does not compile. Text with numbers
 // or names is a function. What people type (tasks, lists, comments, stage names) is never translated.
@@ -596,6 +598,312 @@ export const en = {
         { name: "Dropped", policy: null },
       ],
     },
+  },
+  alerts: {
+    wipOverLimit: (stage: string, days: number, count: number, limit: number) =>
+      `"${stage}" has been over its WIP limit for ${days} days (${count} of ${limit}). Finish something before pulling more in.`,
+    bandWidening: (stage: string, from: number, to: number, days: number) =>
+      `"${stage}" has grown from ${from} to ${to} tasks in ${days} days without shrinking: work is arriving faster than it leaves.`,
+    taskAging: (title: string, days: string, p85: string) =>
+      `"${title}" has been in progress for ${days} days, longer than 85% of finished tasks (${p85} days).`,
+    throughputDrop: (
+      week: string,
+      count: number,
+      average: string,
+      percent: number,
+    ) =>
+      `The week of ${week} finished ${count} tasks, against ${average} a week on average before: a drop of ${percent}%.`,
+    aTask: "A task",
+  },
+  queryErrors: {
+    badDate: "Use a real date as YYYY-MM-DD",
+    future: "The range cannot end in the future",
+    endsBefore: "The range cannot end before it starts",
+    tooLong: (max: number) => `The range can be at most ${max} days`,
+    tasksWhole: "The number of tasks must be a whole number",
+    tasksMin: "The number of tasks must be at least 1",
+    tasksMax: (max: number) => `The number of tasks can be at most ${max}`,
+    seedWhole: "The seed must be a whole number",
+    seedMin: "The seed cannot be negative",
+    seedMax: (max: number) => `The seed can be at most ${max}`,
+    both: "Choose either a number of tasks or a date, not both",
+    dateAfter: "The date must be after today",
+    dateAhead: (max: number) => `The date can be at most ${max} days ahead`,
+  },
+  metricHelp: Object.fromEntries(
+    Object.entries(METRIC_HELP).map(([key, help]) => [
+      key,
+      {
+        title: help.title,
+        what: help.what,
+        why: help.why,
+        read: help.read,
+        sourceLabel: help.source.label,
+      },
+    ]),
+  ) as Record<
+    MetricKey,
+    {
+      title: string;
+      what: string;
+      why: string;
+      read: string;
+      sourceLabel: string;
+    }
+  >,
+  metrics: {
+    title: (list: string) => `Metrics of ${list}`,
+    spaceTitle: (space: string) => `Metrics of the space ${space}`,
+    spaceIntro:
+      "All the lists of the space together. Their stages differ, so the charts group them by category.",
+    rangeLabel: "Range and filters",
+    from: "From",
+    to: "To",
+    type: "Type",
+    anyType: "Any type",
+    noType: "No type",
+    assignee: "Assignee",
+    anyone: "Anyone",
+    unassigned: "Unassigned",
+    apply: "Apply",
+    last: "Last (UTC days)",
+    days: (n: number) => `${n} days`,
+    openForecast: "Open the forecast",
+    errorSuffix: "Showing the last 30 days instead.",
+    figures: {
+      median: "Median cycle time",
+      finished: "Finished",
+      inProgress: "In progress now",
+      older: "Older than 85% of finished",
+    },
+    expand: "Expand",
+    back: "Back to the dashboard",
+    showData: "Show the data",
+    whatIs: "What is this and how to read it",
+    what: "What it is",
+    why: "Why it matters",
+    read: "How to read it",
+    source: "Source",
+    tasks: (n: number) => (n === 1 ? "1 task" : `${n} tasks`),
+    deletedStage: (name: string) => `Deleted stage (${name})`,
+    cfd: {
+      svg: "Cumulative flow diagram",
+      none: "There is no history in this range yet.",
+      summary: (date: string, total: string, parts: string) =>
+        `On ${date} there were ${total} in the flow: ${parts}.`,
+      part: (count: number, name: string) => `${count} in ${name}`,
+      caption: "Tasks per stage at the end of each day",
+      day: "Day",
+    },
+    cycle: {
+      none: "No task was finished in this range.",
+      summary: (
+        finished: string,
+        p50: string,
+        p85: string,
+        p95: string,
+        lead50: string,
+        lead85: string,
+      ) =>
+        `${finished} finished. Half took ${p50} or less, 85% took ${p85} or less and 95% took ${p95} or less. Lead time (from creation): ${lead50} the median, ${lead85} at 85%.`,
+      caption: "Cycle and lead time of each finished task",
+      task: "Task",
+      finishedOn: "Finished",
+      cycleDays: "Cycle time (days)",
+      leadDays: "Lead time (days)",
+      svg: "Cycle time of each finished task",
+      line: (percent: number, days: string) => `${percent}%: ${days}`,
+    },
+    aging: {
+      none: "Nothing is in progress right now.",
+      summary: (total: string, oldest: string) =>
+        `${total} in progress; the oldest has been going for ${oldest}.`,
+      noneOlder: (p85: string) =>
+        ` None is older than the 85th percentile of cycle time (${p85}).`,
+      someOlder: (n: number, p85: string) =>
+        ` ${n} older than the 85th percentile of cycle time (${p85}).`,
+      caption: "Age of each task in progress",
+      task: "Task",
+      stage: "Stage",
+      ageDays: "Age (days)",
+      svg: "Age of each task in progress, by stage",
+      line: (p85: string) => `85% of finished: ${p85}`,
+    },
+    throughput: {
+      summary: (total: string, from: string, to: string) =>
+        `${total} finished between ${from} and ${to}`,
+      perWeek: (average: string) => `, ${average} per week on average`,
+      caption: "Tasks finished per week",
+      week: "Week starting (Monday)",
+      finished: "Finished",
+      svg: "Tasks finished per week",
+      bar: (week: string, n: number) => `Week of ${week}: ${n}`,
+    },
+    wip: {
+      summary: (total: string) => `${total} in progress now.`,
+      over: " At least one stage is over its limit.",
+      of: (limit: number) => ` of ${limit}`,
+      overLimit: " (over the limit)",
+    },
+    efficiency: {
+      none: "No task was finished in this range.",
+      summary: (
+        percent: number,
+        active: string,
+        waiting: string,
+        blocked: string,
+        reopened: number,
+      ) =>
+        `${percent}% of the in-progress time of finished tasks was active work (${active} days active, ${waiting} waiting, ${blocked} of them blocked). Reopened in this range: ${reopened}.`,
+    },
+  },
+  forecast: {
+    title: (list: string) => `Forecast of ${list}`,
+    intro:
+      "A Monte Carlo simulation over the pace of this list: it replays the days of the history window at random, thousands of times, and says how likely each outcome is.",
+    historyFrom: "History from",
+    to: "to",
+    seed: "Seed",
+    workdays: "Only working days (Monday to Friday)",
+    whenTitle: "When will it be done?",
+    numberOfTasks: "Number of tasks",
+    allPending: "All the pending ones",
+    forecastDate: "Forecast the date",
+    howManyTitle: "How many by a date?",
+    dateAfter: "Date (after today)",
+    forecastCount: "Forecast the count",
+    historyWindow: "History window:",
+    errorSuffix: "Showing the default instead.",
+    nothingPending:
+      "There is nothing pending in this list (no tasks in to do, active or waiting), so there is nothing to forecast. Enter a number of tasks to ask anyway.",
+    impossible: (from: string, to: string) =>
+      `No task was finished between ${from} and ${to}, so there is no pace to replay. Choose a longer window or finish some work first.`,
+    noDays: (date: string) =>
+      `There are no days between tomorrow and ${date}, so nothing more can be finished by then.`,
+    noWorkdays: (date: string) =>
+      `There are no working days between tomorrow and ${date}, so nothing more can be finished by then.`,
+    howMany: (
+      date: string,
+      days: number,
+      unit: string,
+      p95: string,
+      p85: string,
+      p50: string,
+    ) =>
+      `By ${date} (${days} ${unit} from tomorrow) the team finishes at least ${p95} with 95% probability, ${p85} with 85%, and ${p50} with 50%.`,
+    notWithin: (percent: number, horizon: number, unit: string) =>
+      `${percent}% probability: not within ${horizon} ${unit}`,
+    within: (percent: number, days: number, unit: string, date: string) =>
+      `${percent}% probability: within ${days} ${unit} (by ${date})`,
+    whenSummary: (items: string, all: boolean, parts: string) =>
+      `Finishing ${items}${all ? " (all the pending ones)" : ""} takes, counting from tomorrow: ${parts}.`,
+    unit: (n: number, workdays: boolean): string =>
+      workdays
+        ? n === 1
+          ? "working day"
+          : "working days"
+        : n === 1
+          ? "day"
+          : "days",
+    whatDays: "Days until done",
+    whatWorkdays: "Working days until done",
+    whatTasks: "Tasks finished",
+    caption: (what: string, runs: string) =>
+      `${what} in ${runs} simulated futures`,
+    simulated: "Simulated futures",
+    share: "Share",
+    settings: (
+      from: string,
+      to: string,
+      days: number,
+      withData: number,
+      finished: number,
+      seed: number,
+      workdaysOnly: boolean,
+      runs: string,
+    ) =>
+      `History ${from} to ${to} (${days} days, ${withData} with finished tasks, ${finished} finished). Seed ${seed}. ${workdaysOnly ? "Working days only." : "All calendar days."} ${runs} simulated futures; the same history and seed always give the same answer.`,
+    barNote:
+      "Each bar is the share of simulated futures (%) that ended with that result; the dashed lines mark 50%, 85% and 95%.",
+    svg: (what: string) => `How the simulated futures spread: ${what}`,
+    barTitle: (label: string, percent: string) =>
+      `${label}: ${percent}% of futures`,
+    warnings: {
+      fewDays: (have: number, need: number) =>
+        `Only ${have} days in this window had finished tasks (fewer than ${need}): treat the forecast as a rough guide.`,
+      fewTasks: (have: number, need: number) =>
+        `Only ${have} tasks were finished in this window (fewer than ${need}): there is little pace to learn from.`,
+    },
+  },
+  /** What a new workspace starts with. */
+  defaults: { types: ["Task", "Bug", "Feature", "Request"] },
+  /** The sample workspace of the demo: its names, and the words its tasks are made of. */
+  sample: {
+    workspace: "Acme Product Team",
+    spaces: { Software: "Software", Support: "Support" },
+    lists: { Platform: "Platform", "Customer requests": "Customer requests" },
+    labels: ["frontend", "backend", "customer", "urgent"],
+    verbs: [
+      "Fix",
+      "Add",
+      "Refactor",
+      "Improve",
+      "Document",
+      "Migrate",
+      "Optimise",
+      "Test",
+      "Remove",
+      "Review",
+    ],
+    areas: [
+      "login redirect",
+      "search filters",
+      "payment webhook",
+      "invoice export",
+      "avatar upload",
+      "rate limiter",
+      "notification settings",
+      "dashboard widgets",
+      "CSV import",
+      "audit log",
+      "password reset",
+      "session timeout",
+      "onboarding checklist",
+      "API pagination",
+      "email templates",
+      "dark theme colours",
+      "cache invalidation",
+      "report scheduler",
+    ],
+    issues: [
+      "Cannot log in",
+      "Invoice shows the wrong total",
+      "Export fails with a timeout",
+      "Request: bulk edit",
+      "Question about permissions",
+      "Email notifications are late",
+      "Cannot reset the password",
+      "Data missing after import",
+      "Question about webhooks",
+      "Billing address change",
+      "Dashboard is slow",
+      "Account deletion request",
+    ],
+    companies: [
+      "Acme",
+      "Globex",
+      "Initech",
+      "Umbrella",
+      "Hooli",
+      "Stark",
+      "Wayne",
+    ],
+    blocks: [
+      "Waiting for API credentials from the vendor",
+      "Needs a decision from product",
+      "The test environment is down",
+      "Waiting for the design review",
+    ],
   },
 };
 

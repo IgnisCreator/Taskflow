@@ -18,6 +18,21 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // Text people read goes through the catalogs (src/lib/i18n), so that every screen has both
+    // languages. A bare text in a page or a component fails here.
+    files: ["src/app/**/*.tsx", "src/components/**/*.tsx"],
+    rules: {
+      "react/jsx-no-literals": [
+        "error",
+        {
+          noStrings: false,
+          ignoreProps: true,
+          allowedStrings: ["TaskFlow", ".", ":", "%", "&larr;"],
+        },
+      ],
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",
