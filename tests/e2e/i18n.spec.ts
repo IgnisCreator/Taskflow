@@ -162,7 +162,7 @@ test.describe("a visitor whose browser asks for Spanish", () => {
       /\d+ tareas terminadas\. La mitad tardó/,
     );
     await expect(page.locator('[data-metric="aging"]')).toContainText(
-      /más antiguas que el percentil 85/,
+      /que el percentil 85 del tiempo de ciclo/,
     );
     await noEnglish("the metrics");
 
