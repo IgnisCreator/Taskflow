@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { describeEvent } from "../../src/lib/events";
+import { formatDueDate } from "../../src/lib/dates";
 import { en } from "../../src/lib/i18n/en";
 import { es } from "../../src/lib/i18n/es";
+import { localizeTemplate } from "../../src/lib/i18n/templates";
+import {
+  describeFlowProblem,
+  flowProblem,
+  SYSTEM_TEMPLATES,
+  validateFlow,
+  type FlowStage,
+} from "../../src/lib/workflow";
 import {
   formatDateTime,
   formatNumber,
@@ -9,10 +19,12 @@ import {
 } from "../../src/lib/i18n";
 
 type Leaf = string | ((...args: never[]) => string);
-type Node = Leaf | Node[] | { [key: string]: Node };
+type Node = Leaf | null | Node[] | { [key: string]: Node };
 
 /** Every text of a catalog with the path that leads to it. */
 function walk(node: Node, path = ""): [string, Leaf][] {
+  // "no policy": the same in both languages, but it must be null in both.
+  if (node === null) return [[path, "∅"]];
   if (typeof node === "string" || typeof node === "function") {
     return [[path, node]];
   }
@@ -98,5 +110,100 @@ describe("formatting", () => {
     expect(plural(1, "task", "tasks")).toBe("task");
     expect(plural(0, "task", "tasks")).toBe("tasks");
     expect(plural(2, "tarea", "tareas")).toBe("tareas");
+  });
+});
+
+describe("the system templates", () => {
+  it("the English catalog says exactly what the templates are made of", () => {
+    for (const [key, template] of Object.entries(SYSTEM_TEMPLATES)) {
+      const text = en.systemTemplates[key as keyof typeof en.systemTemplates];
+      expect(text.name, key).toBe(template.name);
+      expect(text.description, key).toBe(template.description);
+      expect(text.stages, key).toEqual(
+        template.stages.map((s) => ({ name: s.name, policy: s.policy })),
+      );
+    }
+    expect(Object.keys(en.systemTemplates).sort()).toEqual(
+      Object.keys(SYSTEM_TEMPLATES).sort(),
+    );
+  });
+
+  it("Spanish renames the stages and keeps what the metrics depend on", () => {
+    for (const [key, template] of Object.entries(SYSTEM_TEMPLATES)) {
+      const spanish = localizeTemplate(key, template, "es");
+      expect(spanish.stages.map((s) => s.name)).not.toEqual(
+        template.stages.map((s) => s.name),
+      );
+      expect(
+        spanish.stages.map(({ category, wipLimit, isCommitmentPoint }) => ({
+          category,
+          wipLimit,
+          isCommitmentPoint,
+        })),
+      ).toEqual(
+        template.stages.map(({ category, wipLimit, isCommitmentPoint }) => ({
+          category,
+          wipLimit,
+          isCommitmentPoint,
+        })),
+      );
+      // Still a valid flow, with the stage names still distinct.
+      expect(validateFlow(spanish.stages)).toBeNull();
+      expect(localizeTemplate(key, template, "en")).toEqual(template);
+    }
+    // A template with no translation is left alone.
+    const own = SYSTEM_TEMPLATES.generic!;
+    expect(localizeTemplate("nothing", own, "es")).toBe(own);
+  });
+});
+
+describe("flow problems and history lines", () => {
+  const stage = (
+    name: string,
+    category: FlowStage["category"],
+    extra: Partial<FlowStage> = {},
+  ): FlowStage => ({
+    name,
+    category,
+    wipLimit: null,
+    policy: null,
+    isCommitmentPoint: false,
+    ...extra,
+  });
+
+  it("the same problem reads in both languages, and the API sentence stays English", () => {
+    const stages = [
+      stage("Doing", "ACTIVE", { isCommitmentPoint: true }),
+      stage("Todo", "BACKLOG"),
+      stage("Done", "DONE"),
+      stage("Dropped", "DISCARDED"),
+    ];
+    const problem = flowProblem(stages)!;
+    expect(problem.code).toBe("ORDER");
+    expect(describeFlowProblem(problem, en)).toBe(validateFlow(stages));
+    expect(validateFlow(stages)).toContain('"Todo" (to do) cannot come after');
+    expect(describeFlowProblem(problem, es)).toContain("no puede ir después");
+    expect(describeFlowProblem({ code: "COMMITMENT_COUNT" }, es)).toBe(
+      "Elige exactamente un punto de compromiso",
+    );
+    expect(flowProblem(SYSTEM_TEMPLATES.software!.stages)).toBeNull();
+  });
+
+  it("a history line reads in both languages, also for a removed stage", () => {
+    const event = {
+      type: "MOVED" as const,
+      fromStage: { name: "A" },
+      toStage: null,
+      actor: "Ana",
+    };
+    expect(describeEvent(event)).toBe("Ana moved it from A to a removed stage");
+    expect(describeEvent(event, es)).toBe(
+      "Ana la movió de A a una etapa eliminada",
+    );
+  });
+
+  it("due dates follow the language and not the time zone", () => {
+    expect(formatDueDate("2026-03-01")).toBe("Mar 1, 2026");
+    expect(formatDueDate("2026-03-01", "es")).toBe("1 mar 2026");
   });
 });

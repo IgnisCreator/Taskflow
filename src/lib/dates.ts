@@ -26,8 +26,17 @@ const MONTHS = [
   "Dec",
 ];
 
-/** "2026-03-01" -> "Mar 1, 2026", independent of the viewer's time zone. */
-export function formatDueDate(value: string): string {
+/**
+ * "2026-03-01" -> "Mar 1, 2026" (English) or "1 mar 2026" (Spanish), independent of the viewer's
+ * time zone.
+ */
+export function formatDueDate(value: string, lang: "en" | "es" = "en"): string {
   const [year, month, day] = value.split("-").map(Number);
+  if (lang === "es") {
+    return new Date(Date.UTC(year!, month! - 1, day!)).toLocaleDateString(
+      "es-ES",
+      { dateStyle: "medium", timeZone: "UTC" },
+    );
+  }
   return `${MONTHS[month! - 1]} ${day}, ${year}`;
 }

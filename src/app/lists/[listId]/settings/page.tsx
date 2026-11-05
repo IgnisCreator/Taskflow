@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ApiForm } from "@/components/api-form";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { ALERT_LIMITS } from "@/lib/alerts";
+import { getT } from "@/server/i18n";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
 import { getList } from "@/server/services/lists";
@@ -13,6 +14,7 @@ export default async function ListSettingsPage({
   params: Promise<{ listId: string }>;
 }) {
   const user = await loadUser();
+  const { t } = await getT();
   const list = await getList(user.id, (await params).listId);
   if (!list || !can(list, "structure:manage")) notFound();
   const workspace = await loadWorkspace(user.id, list.workspaceId);
@@ -22,16 +24,16 @@ export default async function ListSettingsPage({
   return (
     <WorkspaceShell workspace={workspace} currentListId={list.id}>
       <main className="space-y-6">
-        <h1 className="text-2xl font-semibold">List settings</h1>
+        <h1 className="text-2xl font-semibold">{t.listSettings.title}</h1>
         <ApiForm
           method="PATCH"
           url={url}
           extra={version}
-          submit="Save"
+          submit={t.listSettings.save}
           className="card space-y-3"
         >
           <label className="field">
-            Name
+            {t.listSettings.name}
             <input
               name="name"
               required
@@ -41,7 +43,7 @@ export default async function ListSettingsPage({
             />
           </label>
           <label className="field">
-            Description (optional)
+            {t.listSettings.description}
             <textarea
               name="description"
               maxLength={5000}
@@ -55,16 +57,15 @@ export default async function ListSettingsPage({
           method="PATCH"
           url={url}
           extra={version}
-          submit="Save alert thresholds"
+          submit={t.listSettings.saveThresholds}
           className="card space-y-3"
         >
-          <h2 className="text-lg font-semibold">Alerts</h2>
-          <p className="text-sm text-muted">
-            Once a day TaskFlow checks this list and notifies the admins (stage
-            alerts) or the assignees (a task that is too old).
-          </p>
+          <h2 className="text-lg font-semibold">
+            {t.listSettings.alertsTitle}
+          </h2>
+          <p className="text-sm text-muted">{t.listSettings.alertsHelp}</p>
           <label className="field">
-            Days over a stage&apos;s WIP limit before alerting
+            {t.listSettings.wipDays}
             <input
               name="alertWipDays"
               type="number"
@@ -76,7 +77,7 @@ export default async function ListSettingsPage({
             />
           </label>
           <label className="field">
-            Days a stage must keep growing before alerting
+            {t.listSettings.bandDays}
             <input
               name="alertBandDays"
               type="number"
@@ -88,7 +89,7 @@ export default async function ListSettingsPage({
             />
           </label>
           <label className="field">
-            Weekly throughput drop (%) before alerting
+            {t.listSettings.dropPercent}
             <input
               name="alertDropPercent"
               type="number"
@@ -105,17 +106,15 @@ export default async function ListSettingsPage({
           url={url}
           extra={version}
           redirectTo={`/w/${list.workspaceId}`}
-          submit="Delete list"
+          submit={t.listSettings.deleteList}
           danger
           confirmText={list.name}
           className="card-danger space-y-3"
         >
           <h2 className="text-lg font-semibold text-danger-text">
-            Delete list
+            {t.listSettings.deleteList}
           </h2>
-          <p className="text-sm text-muted">
-            This permanently deletes the board and its tasks.
-          </p>
+          <p className="text-sm text-muted">{t.listSettings.deleteListHint}</p>
         </ApiForm>
       </main>
     </WorkspaceShell>

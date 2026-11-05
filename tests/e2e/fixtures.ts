@@ -107,7 +107,13 @@ export async function seedBoard() {
       createdById: owner.id,
     })),
   });
-  return { listId: list.id, workspaceId: workspace.id, owner, member };
+  return {
+    listId: list.id,
+    workspaceId: workspace.id,
+    spaceId: workspace.spaces[0]!.id,
+    owner,
+    member,
+  };
 }
 
 export async function cleanup() {

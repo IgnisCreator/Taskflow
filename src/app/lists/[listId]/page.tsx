@@ -60,27 +60,27 @@ export default async function ListPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="badge normal-case">
-              {roleLabel(workspace.roleLabels, list.role)}
+              {roleLabel(workspace.roleLabels, list.role, t.roles)}
             </span>
             <Link href={`/lists/${list.id}/metrics`} className="btn-secondary">
-              Metrics
+              {t.listPage.metrics}
             </Link>
             <Link href={`/lists/${list.id}/forecast`} className="btn-secondary">
-              Forecast
+              {t.listPage.forecast}
             </Link>
             <Link href={`/lists/${list.id}/activity`} className="btn-secondary">
-              Activity
+              {t.listPage.activity}
             </Link>
             {can(list, "structure:manage") && (
               <>
                 <Link href={`/lists/${list.id}/flow`} className="btn-secondary">
-                  Workflow
+                  {t.listPage.workflow}
                 </Link>
                 <Link
                   href={`/lists/${list.id}/settings`}
                   className="btn-secondary"
                 >
-                  List settings
+                  {t.listPage.settings}
                 </Link>
               </>
             )}

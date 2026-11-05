@@ -4,6 +4,7 @@ import { MembersPanel } from "@/components/members-panel";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { roleLabel } from "@/lib/roles";
 import { ROLES } from "@/lib/validations/workspaces";
+import { getT } from "@/server/i18n";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
 import { listCatalog } from "@/server/services/catalog";
@@ -16,27 +17,30 @@ export default async function WorkspaceSettingsPage({
   params: Promise<{ workspaceId: string }>;
 }) {
   const user = await loadUser();
+  const { lang, t } = await getT();
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const members = await listMembers(user.id, workspace.id);
-  const templates = await listTemplates(user.id, workspace.id);
+  const templates = await listTemplates(user.id, workspace.id, lang);
   const catalog = await listCatalog(user.id, workspace.id);
   const url = `/api/workspaces/${workspace.id}`;
 
   return (
     <WorkspaceShell workspace={workspace}>
       <main className="space-y-6">
-        <h1 className="text-2xl font-semibold">Workspace settings</h1>
+        <h1 className="text-2xl font-semibold">{t.settings.title}</h1>
         {can(workspace, "workspace:edit") ? (
           <>
             <ApiForm
               method="PATCH"
               url={url}
-              submit="Save name"
+              submit={t.settings.saveName}
               className="card space-y-3"
             >
-              <h2 className="text-lg font-semibold">Name</h2>
+              <h2 className="text-lg font-semibold">
+                {t.settings.nameHeading}
+              </h2>
               <label className="field">
-                Workspace name
+                {t.settings.workspaceName}
                 <input
                   name="name"
                   required
@@ -49,20 +53,16 @@ export default async function WorkspaceSettingsPage({
             <RoleLabelsForm url={url} labels={workspace.roleLabels} />
           </>
         ) : (
-          <p className="card text-muted">
-            Only the owner and admins can change these settings.
-          </p>
+          <p className="card text-muted">{t.settings.onlyAdmins}</p>
         )}
         {can(workspace, "structure:manage") && (
           <section className="card space-y-3">
-            <h2 className="text-lg font-semibold">Flow templates</h2>
-            <p className="text-sm text-muted">
-              Flows saved from a list (use &ldquo;Save as template&rdquo; on a
-              list workflow page). The system templates are always available and
-              cannot be edited.
-            </p>
+            <h2 className="text-lg font-semibold">
+              {t.settings.templatesTitle}
+            </h2>
+            <p className="text-sm text-muted">{t.settings.templatesHelp}</p>
             {templates.organisation.length === 0 && (
-              <p className="text-sm text-muted">No templates saved yet.</p>
+              <p className="text-sm text-muted">{t.settings.noTemplates}</p>
             )}
             <ul className="space-y-3">
               {templates.organisation.map((template) => (
@@ -73,11 +73,11 @@ export default async function WorkspaceSettingsPage({
                   <ApiForm
                     method="PATCH"
                     url={`/api/templates/${template.ref}`}
-                    submit="Rename"
+                    submit={t.settings.rename}
                     className="flex flex-1 flex-wrap items-end gap-2"
                   >
                     <label className="field flex-1">
-                      Template name
+                      {t.settings.templateName}
                       <input
                         name="name"
                         required
@@ -88,12 +88,12 @@ export default async function WorkspaceSettingsPage({
                     </label>
                   </ApiForm>
                   <span className="text-sm text-muted">
-                    {template.stages.length} stages
+                    {t.settings.stages(template.stages.length)}
                   </span>
                   <ApiForm
                     method="DELETE"
                     url={`/api/templates/${template.ref}`}
-                    submit={`Delete ${template.name}`}
+                    submit={t.settings.deleteNamed(template.name)}
                     danger
                     className="flex items-end gap-2"
                   />
@@ -107,15 +107,11 @@ export default async function WorkspaceSettingsPage({
             <CatalogSection
               workspaceId={workspace.id}
               kind="types"
-              title="Task types"
-              help="The kinds of work your team handles (a task, a bug, a request...). Metrics can be split by type."
               items={catalog.types}
             />
             <CatalogSection
               workspaceId={workspace.id}
               kind="labels"
-              title="Labels"
-              help="Free tags any task can carry, to group work across lists."
               items={catalog.labels}
             />
           </>
@@ -131,16 +127,16 @@ export default async function WorkspaceSettingsPage({
             method="DELETE"
             url={url}
             redirectTo="/workspaces"
-            submit="Delete workspace"
+            submit={t.settings.deleteWorkspace}
             danger
             confirmText={workspace.name}
             className="card-danger space-y-3"
           >
             <h2 className="text-lg font-semibold text-danger-text">
-              Delete workspace
+              {t.settings.deleteWorkspace}
             </h2>
             <p className="text-sm text-muted">
-              This permanently deletes every space, list and task in it.
+              {t.settings.deleteWorkspaceHint}
             </p>
           </ApiForm>
         )}
@@ -150,36 +146,33 @@ export default async function WorkspaceSettingsPage({
 }
 
 /** Renaming a role changes only what people see; what each role may do stays the same. */
-function RoleLabelsForm({
+async function RoleLabelsForm({
   url,
   labels,
 }: {
   url: string;
   labels: Record<string, string>;
 }) {
+  const { t } = await getT();
   return (
     <ApiForm
       method="PATCH"
       url={url}
-      submit="Save role names"
+      submit={t.settings.saveRoleNames}
       className="card space-y-3"
     >
-      <h2 className="text-lg font-semibold">Role names</h2>
-      <p className="text-sm text-muted">
-        Call the roles what your team calls them, for example Client instead of
-        Guest. Permissions do not change. Leave a field empty to use the default
-        name.
-      </p>
+      <h2 className="text-lg font-semibold">{t.settings.roleNamesTitle}</h2>
+      <p className="text-sm text-muted">{t.settings.roleNamesHelp}</p>
       <fieldset className="grid gap-3 sm:grid-cols-2">
-        <legend className="sr-only">Role names</legend>
+        <legend className="sr-only">{t.settings.roleNamesTitle}</legend>
         {ROLES.map((role) => (
           <label key={role} className="field">
-            {roleLabel({}, role)}
+            {roleLabel({}, role, t.roles)}
             <input
               name={`roleLabels.${role}`}
               maxLength={30}
               defaultValue={labels[role] ?? ""}
-              placeholder={roleLabel({}, role)}
+              placeholder={roleLabel({}, role, t.roles)}
               className="input"
             />
           </label>

@@ -2,6 +2,8 @@
 // between lists, the system templates, and the default mapping when a flow is replaced. The browser
 // editor and the server use the same functions.
 
+import { en, type Catalog } from "@/lib/i18n/en";
+
 export const CATEGORIES = [
   "BACKLOG",
   "ACTIVE",
@@ -42,37 +44,95 @@ export type FlowStage = {
   isCommitmentPoint: boolean;
 };
 
+/** What is wrong with a flow, as data: the screens write it in the reader's language. */
+export type FlowProblem =
+  | { code: "TOO_MANY" }
+  | { code: "NAME_REQUIRED" }
+  | { code: "DUPLICATE"; name: string }
+  | { code: "LIMIT_NOT_ALLOWED"; name: string; category: Category }
+  | { code: "MISSING"; category: Category }
+  | {
+      code: "ORDER";
+      name: string;
+      category: Category;
+      previous: string;
+      previousCategory: Category;
+    }
+  | { code: "COMMITMENT_COUNT" }
+  | { code: "COMMITMENT_CATEGORY" };
+
 /** The first problem with a flow, or null when it is valid. */
-export function validateFlow(stages: FlowStage[]): string | null {
-  if (stages.length > MAX_STAGES) {
-    return `A flow has at most ${MAX_STAGES} stages`;
-  }
+export function flowProblem(stages: FlowStage[]): FlowProblem | null {
+  if (stages.length > MAX_STAGES) return { code: "TOO_MANY" };
   const names = new Set<string>();
   for (const stage of stages) {
     const key = stage.name.trim().toLowerCase();
-    if (!key) return "Every stage needs a name";
-    if (names.has(key)) return `Two stages are called "${stage.name.trim()}"`;
+    if (!key) return { code: "NAME_REQUIRED" };
+    if (names.has(key)) return { code: "DUPLICATE", name: stage.name.trim() };
     names.add(key);
     if (stage.wipLimit !== null && !CAN_LIMIT.includes(stage.category)) {
-      return `"${stage.name.trim()}" is ${CATEGORY_LABEL[stage.category].toLowerCase()}: only to do, active and waiting stages can have a WIP limit`;
+      return {
+        code: "LIMIT_NOT_ALLOWED",
+        name: stage.name.trim(),
+        category: stage.category,
+      };
     }
   }
   for (const category of REQUIRED) {
     if (!stages.some((s) => s.category === category)) {
-      return `The flow needs at least one ${CATEGORY_LABEL[category].toLowerCase()} stage`;
+      return { code: "MISSING", category };
     }
   }
   for (let i = 1; i < stages.length; i++) {
     if (RANK[stages[i]!.category] < RANK[stages[i - 1]!.category]) {
-      return `"${stages[i]!.name.trim()}" (${CATEGORY_LABEL[stages[i]!.category].toLowerCase()}) cannot come after "${stages[i - 1]!.name.trim()}" (${CATEGORY_LABEL[stages[i - 1]!.category].toLowerCase()}): the order is to do, active or waiting, done, discarded`;
+      return {
+        code: "ORDER",
+        name: stages[i]!.name.trim(),
+        category: stages[i]!.category,
+        previous: stages[i - 1]!.name.trim(),
+        previousCategory: stages[i - 1]!.category,
+      };
     }
   }
   const points = stages.filter((s) => s.isCommitmentPoint);
-  if (points.length !== 1) return "Choose exactly one commitment point";
-  if (points[0]!.category !== "ACTIVE") {
-    return "The commitment point must be an active stage";
-  }
+  if (points.length !== 1) return { code: "COMMITMENT_COUNT" };
+  if (points[0]!.category !== "ACTIVE") return { code: "COMMITMENT_CATEGORY" };
   return null;
+}
+
+/** The problem as a sentence in the language of `t` (the API uses English). */
+export function describeFlowProblem(problem: FlowProblem, t: Catalog): string {
+  const p = t.flow.problems;
+  const label = (category: Category) => t.categories[category].toLowerCase();
+  switch (problem.code) {
+    case "TOO_MANY":
+      return p.tooMany(MAX_STAGES);
+    case "NAME_REQUIRED":
+      return p.nameRequired;
+    case "DUPLICATE":
+      return p.duplicate(problem.name);
+    case "LIMIT_NOT_ALLOWED":
+      return p.limitNotAllowed(problem.name, label(problem.category));
+    case "MISSING":
+      return p.missing(label(problem.category));
+    case "ORDER":
+      return p.order(
+        problem.name,
+        label(problem.category),
+        problem.previous,
+        label(problem.previousCategory),
+      );
+    case "COMMITMENT_COUNT":
+      return p.commitmentCount;
+    case "COMMITMENT_CATEGORY":
+      return p.commitmentCategory;
+  }
+}
+
+/** The first problem with a flow in English, or null when it is valid. */
+export function validateFlow(stages: FlowStage[]): string | null {
+  const problem = flowProblem(stages);
+  return problem && describeFlowProblem(problem, en);
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import type { Role } from "@/lib/validations/workspaces";
 
@@ -19,6 +20,7 @@ export function SpaceAccess({
   people: Person[];
 }) {
   const router = useRouter();
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -39,16 +41,10 @@ export function SpaceAccess({
   );
   return (
     <section className="card space-y-3">
-      <h2 className="text-lg font-semibold">Who can see it</h2>
-      <p className="text-sm text-muted">
-        The owner and admins see every space. Members see public spaces and the
-        private ones they are listed in; guests only the spaces they are listed
-        in.
-      </p>
+      <h2 className="text-lg font-semibold">{t.space.accessTitle}</h2>
+      <p className="text-sm text-muted">{t.space.accessHelp}</p>
       {listable.length === 0 ? (
-        <p className="text-sm text-muted">
-          There are no members or guests in the workspace yet.
-        </p>
+        <p className="text-sm text-muted">{t.space.accessNone}</p>
       ) : (
         <ul className="space-y-2">
           {listable.map((person) => (
@@ -61,7 +57,9 @@ export function SpaceAccess({
                   onChange={() => void toggle(person)}
                 />
                 {person.name}
-                <span className="badge">{person.role.toLowerCase()}</span>
+                <span className="badge">
+                  {t.roles[person.role].toLowerCase()}
+                </span>
               </label>
             </li>
           ))}

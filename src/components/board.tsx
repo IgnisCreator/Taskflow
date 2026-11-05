@@ -136,10 +136,10 @@ export function Board({
 
   const allTasks = shown.flatMap((column) => column.tasks);
   const titleOf = (id: string | number) =>
-    allTasks.find((task) => task.id === id)?.title ?? "task";
+    allTasks.find((task) => task.id === id)?.title ?? t.drag.task;
   const labelOf = (id: string | number) => {
     const column = shown.find((c) => columnDropId(c.id) === id);
-    return column ? `column ${column.name}` : titleOf(id);
+    return column ? t.drag.column(column.name) : titleOf(id);
   };
 
   function onDragEnd({ active, over }: DragEndEvent) {
@@ -176,17 +176,16 @@ export function Board({
         onDragCancel={() => setActiveId(null)}
         accessibility={{
           announcements: {
-            onDragStart: ({ active }) => `Picked up ${titleOf(active.id)}.`,
+            onDragStart: ({ active }) => t.drag.pickedUp(titleOf(active.id)),
             onDragOver: ({ active, over }) =>
               over
-                ? `${titleOf(active.id)} is over ${labelOf(over.id)}.`
-                : `${titleOf(active.id)} is not over a drop area.`,
+                ? t.drag.over(titleOf(active.id), labelOf(over.id))
+                : t.drag.notOver(titleOf(active.id)),
             onDragEnd: ({ active, over }) =>
               over
-                ? `${titleOf(active.id)} was dropped on ${labelOf(over.id)}.`
-                : `${titleOf(active.id)} was dropped.`,
-            onDragCancel: ({ active }) =>
-              `Moving ${titleOf(active.id)} was cancelled.`,
+                ? t.drag.dropped(titleOf(active.id), labelOf(over.id))
+                : t.drag.droppedNowhere(titleOf(active.id)),
+            onDragCancel: ({ active }) => t.drag.cancelled(titleOf(active.id)),
           },
         }}
       >
@@ -277,9 +276,9 @@ function BoardColumn({
         {column.name}
         <span className="badge">
           {filtered
-            ? `${column.tasks.length} of ${column.total}`
+            ? t.card.count(column.tasks.length, column.total)
             : column.tasks.length}
-          {column.wipLimit !== null && ` · limit ${column.wipLimit}`}
+          {column.wipLimit !== null && t.card.limit(column.wipLimit)}
         </span>
       </h2>
       {column.policy && <p className="text-xs text-muted">{column.policy}</p>}
@@ -363,6 +362,7 @@ function CardContent({
   task: TaskView;
   members: MemberView[];
 }) {
+  const { lang, t } = useT();
   const assignees = members
     .filter((member) => task.assigneeIds.includes(member.userId))
     .map((member) => member.name);
@@ -373,11 +373,11 @@ function CardContent({
         <span
           className={`badge ${task.priority === "HIGH" ? "text-danger-text" : ""}`}
         >
-          {task.priority.toLowerCase()}
+          {t.priorities[task.priority].toLowerCase()}
         </span>
         {task.blockedReason !== null && (
           <span className="badge text-danger-text" title={task.blockedReason}>
-            blocked
+            {t.card.blocked}
           </span>
         )}
         {task.type && <span className="badge">{task.type.name}</span>}
@@ -386,10 +386,12 @@ function CardContent({
             {label.name}
           </span>
         ))}
-        {task.dueDate && <span>Due {formatDueDate(task.dueDate)}</span>}
+        {task.dueDate && (
+          <span>{t.card.due(formatDueDate(task.dueDate, lang))}</span>
+        )}
         {task.subtasks.total > 0 && (
           <span>
-            {task.subtasks.done}/{task.subtasks.total} done
+            {t.card.checklist(task.subtasks.done, task.subtasks.total)}
           </span>
         )}
         {assignees.length > 0 && <span>{assignees.join(", ")}</span>}

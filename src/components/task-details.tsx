@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import { describeEvent, type EventView } from "@/lib/events";
+import { LOCALE, type Lang } from "@/lib/i18n";
 
 type Subtask = { id: string; title: string; done: boolean };
 type Comment = {
@@ -18,8 +20,8 @@ type Detail = {
   events: (EventView & { id: string; at: string })[];
 };
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", {
+const when = (iso: string, lang: Lang) =>
+  new Date(iso).toLocaleString(LOCALE[lang], {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -42,6 +44,7 @@ export function TaskDetails({
   canModerate: boolean;
 }) {
   const router = useRouter();
+  const { lang, t } = useT();
   const base = `/api/lists/${listId}/tasks/${taskId}`;
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +58,7 @@ export function TaskDetails({
       return null;
     }
   }
-  const loadError = "Could not load the checklist, comments and history.";
+  const loadError = t.details.loadError;
 
   useEffect(() => {
     let cancelled = false;
@@ -106,12 +109,14 @@ export function TaskDetails({
           {error}
         </p>
       )}
-      {!detail && !error && <p className="text-sm text-muted">Loading...</p>}
+      {!detail && !error && (
+        <p className="text-sm text-muted">{t.details.loading}</p>
+      )}
       {detail && (
         <>
           <section aria-labelledby="subtasks-heading" className="space-y-2">
             <h3 id="subtasks-heading" className="font-medium">
-              Checklist
+              {t.details.checklist}
               {detail.subtasks.length > 0 &&
                 ` (${detail.subtasks.filter((s) => s.done).length}/${detail.subtasks.length})`}
             </h3>
@@ -160,19 +165,19 @@ export function TaskDetails({
                         )
                       }
                     >
-                      Remove {subtask.title}
+                      {t.details.removeItem(subtask.title)}
                     </button>
                   )}
                 </li>
               ))}
             </ul>
             {detail.subtasks.length === 0 && (
-              <p className="text-sm text-muted">No checklist items.</p>
+              <p className="text-sm text-muted">{t.details.noItems}</p>
             )}
             {canWrite && (
               <form onSubmit={onAddSubtask} className="flex items-end gap-2">
                 <label className="field flex-1">
-                  New checklist item
+                  {t.details.newItem}
                   <input
                     name="title"
                     required
@@ -181,7 +186,7 @@ export function TaskDetails({
                   />
                 </label>
                 <button type="submit" className="btn-secondary">
-                  Add item
+                  {t.details.addItem}
                 </button>
               </form>
             )}
@@ -189,7 +194,7 @@ export function TaskDetails({
 
           <section aria-labelledby="comments-heading" className="space-y-2">
             <h3 id="comments-heading" className="font-medium">
-              Comments
+              {t.details.comments}
             </h3>
             <ul className="space-y-3">
               {detail.comments.map((comment) => (
@@ -198,7 +203,7 @@ export function TaskDetails({
                     <span className="font-medium text-fg">
                       {comment.author.name}
                     </span>
-                    {when(comment.createdAt)}
+                    {when(comment.createdAt, lang)}
                     {canWrite &&
                       (comment.author.id === viewerId || canModerate) && (
                         <button
@@ -214,7 +219,7 @@ export function TaskDetails({
                             )
                           }
                         >
-                          Delete comment by {comment.author.name}
+                          {t.details.deleteComment(comment.author.name)}
                         </button>
                       )}
                   </p>
@@ -223,12 +228,12 @@ export function TaskDetails({
               ))}
             </ul>
             {detail.comments.length === 0 && (
-              <p className="text-sm text-muted">No comments yet.</p>
+              <p className="text-sm text-muted">{t.details.noComments}</p>
             )}
             {canWrite && (
               <form onSubmit={onAddComment} className="space-y-2">
                 <label className="field">
-                  New comment
+                  {t.details.newComment}
                   <textarea
                     name="body"
                     required
@@ -238,7 +243,7 @@ export function TaskDetails({
                   />
                 </label>
                 <button type="submit" className="btn-secondary">
-                  Add comment
+                  {t.details.addComment}
                 </button>
               </form>
             )}
@@ -246,13 +251,13 @@ export function TaskDetails({
 
           <section aria-labelledby="history-heading" className="space-y-2">
             <h3 id="history-heading" className="font-medium">
-              History
+              {t.details.history}
             </h3>
             <ul className="space-y-1 text-sm">
               {detail.events.map((event) => (
                 <li key={event.id}>
-                  <span className="text-muted">{when(event.at)}</span>{" "}
-                  {describeEvent(event)}
+                  <span className="text-muted">{when(event.at, lang)}</span>{" "}
+                  {describeEvent(event, t)}
                 </li>
               ))}
             </ul>

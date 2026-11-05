@@ -1,3 +1,4 @@
+import { getT } from "@/server/i18n";
 import type { listTemplates } from "@/server/services/templates";
 
 type Templates = Awaited<ReturnType<typeof listTemplates>>;
@@ -6,7 +7,7 @@ type Templates = Awaited<ReturnType<typeof listTemplates>>;
  * A native select of flow templates (system ones, then the workspace own). The empty option is
  * what `none` says; the form turns it into null.
  */
-export function TemplateSelect({
+export async function TemplateSelect({
   name,
   label,
   none,
@@ -19,12 +20,13 @@ export function TemplateSelect({
   templates: Templates;
   value?: string | null;
 }) {
+  const { t: text } = await getT();
   return (
     <label className="field">
       {label}
       <select name={name} defaultValue={value ?? ""} className="input">
         <option value="">{none}</option>
-        <optgroup label="System templates">
+        <optgroup label={text.templateSelect.system}>
           {templates.system.map((t) => (
             <option key={t.ref} value={t.ref}>
               {t.name}
@@ -32,7 +34,7 @@ export function TemplateSelect({
           ))}
         </optgroup>
         {templates.organisation.length > 0 && (
-          <optgroup label="Your workspace">
+          <optgroup label={text.templateSelect.yours}>
             {templates.organisation.map((t) => (
               <option key={t.ref} value={t.ref}>
                 {t.name}

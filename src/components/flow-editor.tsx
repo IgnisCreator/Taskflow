@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import {
   CATEGORIES,
-  CATEGORY_LABEL,
   MAX_STAGES,
   defaultTarget,
-  validateFlow,
+  describeFlowProblem,
+  flowProblem,
   type Category,
   type FlowStage,
 } from "@/lib/workflow";
@@ -18,7 +19,7 @@ export type TemplateOption = {
   ref: string;
   name: string;
   stages: FlowStage[];
-  group: "System" | "Your workspace";
+  group: "system" | "workspace";
 };
 
 /** A row being edited. `id` is set for a stage that already exists; `key` identifies it in the form. */
@@ -70,6 +71,7 @@ export function FlowEditor({
   saved: boolean;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const initial = stages.map((stage) => fromStage(stage, stage.id));
   const [rows, setRows] = useState<Row[]>(initial);
   // Existing stages that are no longer in the flow, and where their tasks go (a row key).
@@ -82,7 +84,8 @@ export function FlowEditor({
   const [pending, setPending] = useState(false);
 
   const removed = stages.filter((stage) => removedIds.includes(stage.id));
-  const problem = validateFlow(rows.map(toStage));
+  const found = flowProblem(rows.map(toStage));
+  const problem = found && describeFlowProblem(found, t);
   const targetFor = (stage: ExistingStage) => {
     const chosen = target[stage.id];
     if (chosen && rows.some((row) => row.key === chosen)) return chosen;
@@ -143,7 +146,7 @@ export function FlowEditor({
   }
 
   function loadTemplate() {
-    const chosen = templates.find((t) => t.ref === template);
+    const chosen = templates.find((o) => o.ref === template);
     if (!chosen) return;
     setDirty(true);
     setRows(chosen.stages.map((stage) => fromStage(stage)));
@@ -187,26 +190,30 @@ export function FlowEditor({
   return (
     <div className="space-y-6">
       <section className="card space-y-3">
-        <h2 className="text-lg font-semibold">Start from a template</h2>
-        <p className="text-sm text-muted">
-          Loading a template replaces the stages below. Nothing changes until
-          you save, and the tasks of any replaced stage go where you choose.
-        </p>
+        <h2 className="text-lg font-semibold">{t.flow.startTitle}</h2>
+        <p className="text-sm text-muted">{t.flow.startHelp}</p>
         <div className="flex flex-wrap items-end gap-2">
           <label className="field min-w-56 flex-1">
-            Template
+            {t.flow.template}
             <select
               value={template}
               onChange={(event) => setTemplate(event.target.value)}
               className="input"
             >
-              {(["System", "Your workspace"] as const).map((group) => {
-                const options = templates.filter((t) => t.group === group);
+              {(["system", "workspace"] as const).map((group) => {
+                const options = templates.filter((o) => o.group === group);
                 return options.length === 0 ? null : (
-                  <optgroup key={group} label={group}>
-                    {options.map((t) => (
-                      <option key={t.ref} value={t.ref}>
-                        {t.name}
+                  <optgroup
+                    key={group}
+                    label={
+                      group === "system"
+                        ? t.flow.groupSystem
+                        : t.flow.groupWorkspace
+                    }
+                  >
+                    {options.map((o) => (
+                      <option key={o.ref} value={o.ref}>
+                        {o.name}
                       </option>
                     ))}
                   </optgroup>
@@ -219,30 +226,29 @@ export function FlowEditor({
             className="btn-secondary"
             onClick={loadTemplate}
           >
-            Load template
+            {t.flow.load}
           </button>
           <button type="button" className="btn-secondary" onClick={reset}>
-            Undo my changes
+            {t.flow.undo}
           </button>
         </div>
       </section>
 
       <section className="space-y-3" aria-labelledby="stages-heading">
         <h2 id="stages-heading" className="text-lg font-semibold">
-          Stages
+          {t.flow.stagesTitle}
         </h2>
         <p className="text-sm text-muted">
-          Work moves from top to bottom. The order of categories is fixed: to
-          do, then active or waiting, then done, then discarded. The{" "}
-          <strong>commitment point</strong> is where a task counts as started:
-          the cycle time begins there.
+          {t.flow.stagesHelpBefore}
+          <strong>{t.flow.commitmentPoint}</strong>
+          {t.flow.stagesHelpAfter}
         </p>
         <ol className="space-y-3">
           {rows.map((row, index) => (
             <li key={row.key} className="card space-y-3 p-4">
               <div className="flex flex-wrap items-end gap-3">
                 <label className="field min-w-48 flex-1">
-                  Name
+                  {t.flow.name}
                   <input
                     value={row.name}
                     maxLength={40}
@@ -251,7 +257,7 @@ export function FlowEditor({
                   />
                 </label>
                 <label className="field">
-                  Category
+                  {t.flow.category}
                   <select
                     value={row.category}
                     onChange={(e) =>
@@ -261,13 +267,13 @@ export function FlowEditor({
                   >
                     {CATEGORIES.map((category) => (
                       <option key={category} value={category}>
-                        {CATEGORY_LABEL[category]}
+                        {t.categories[category]}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field w-28">
-                  WIP limit
+                  {t.flow.wipLimit}
                   <input
                     type="number"
                     min={1}
@@ -276,13 +282,13 @@ export function FlowEditor({
                     onChange={(e) =>
                       update(row.key, { wipLimit: e.target.value })
                     }
-                    placeholder="None"
+                    placeholder={t.flow.none}
                     className="input"
                   />
                 </label>
               </div>
               <label className="field">
-                Policy: what it takes to enter or leave this stage
+                {t.flow.policy}
                 <input
                   value={row.policy}
                   maxLength={300}
@@ -300,7 +306,7 @@ export function FlowEditor({
                       update(row.key, { isCommitmentPoint: true })
                     }
                   />
-                  Commitment point
+                  {t.flow.commitment}
                 </label>
                 <span className="ml-auto flex flex-wrap gap-2">
                   <button
@@ -309,7 +315,7 @@ export function FlowEditor({
                     disabled={index === 0}
                     onClick={() => move(index, -1)}
                   >
-                    Move {row.name || "stage"} up
+                    {t.flow.up(row.name || t.flow.stageFallback)}
                   </button>
                   <button
                     type="button"
@@ -317,14 +323,14 @@ export function FlowEditor({
                     disabled={index === rows.length - 1}
                     onClick={() => move(index, 1)}
                   >
-                    Move {row.name || "stage"} down
+                    {t.flow.down(row.name || t.flow.stageFallback)}
                   </button>
                   <button
                     type="button"
                     className="btn-danger"
                     onClick={() => remove(row)}
                   >
-                    Remove {row.name || "stage"}
+                    {t.flow.remove(row.name || t.flow.stageFallback)}
                   </button>
                 </span>
               </div>
@@ -337,21 +343,20 @@ export function FlowEditor({
           disabled={rows.length >= MAX_STAGES}
           onClick={add}
         >
-          Add a stage
+          {t.flow.add}
         </button>
       </section>
 
       {removed.some((stage) => stage.tasks > 0) && (
         <section className="card space-y-3" aria-labelledby="move-heading">
           <h2 id="move-heading" className="text-lg font-semibold">
-            Where do the tasks of removed stages go?
+            {t.flow.whereTitle}
           </h2>
           {removed
             .filter((stage) => stage.tasks > 0)
             .map((stage) => (
               <label key={stage.id} className="field">
-                {stage.name}: {stage.tasks} task{stage.tasks === 1 ? "" : "s"}{" "}
-                move to
+                {t.flow.tasksMove(stage.name, stage.tasks)}
                 <select
                   value={targetFor(stage)}
                   onChange={(e) =>
@@ -364,16 +369,13 @@ export function FlowEditor({
                 >
                   {rows.map((row) => (
                     <option key={row.key} value={row.key}>
-                      {row.name || "(unnamed stage)"}
+                      {row.name || t.flow.unnamed}
                     </option>
                   ))}
                 </select>
               </label>
             ))}
-          <p className="text-sm text-muted">
-            They are added at the end of the chosen stage, in their current
-            order.
-          </p>
+          <p className="text-sm text-muted">{t.flow.whereHint}</p>
         </section>
       )}
 
@@ -386,7 +388,7 @@ export function FlowEditor({
         )}
         {saved && !dirty && (
           <p role="status" className="notice">
-            Flow saved.
+            {t.flow.saved}
           </p>
         )}
         <button
@@ -395,7 +397,7 @@ export function FlowEditor({
           disabled={pending || problem !== null}
           onClick={() => void save()}
         >
-          Save flow
+          {t.flow.save}
         </button>
       </div>
     </div>
