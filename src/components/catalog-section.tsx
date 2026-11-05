@@ -1,30 +1,28 @@
 import { ApiForm } from "@/components/api-form";
 import type { Catalog } from "@/lib/validations/details";
+import { getT } from "@/server/i18n";
 
 /**
  * Manage one of the two lists a workspace keeps (task types, labels): rename, delete, add.
  * Deleting a type leaves its tasks without a type; deleting a label takes it off its tasks.
  */
-export function CatalogSection({
+export async function CatalogSection({
   workspaceId,
   kind,
-  title,
-  help,
   items,
 }: {
   workspaceId: string;
   kind: Catalog;
-  title: string;
-  help: string;
   items: { id: string; name: string }[];
 }) {
-  const one = kind === "types" ? "task type" : "label";
+  const { t } = await getT();
+  const text = t.catalog[kind];
   return (
     <section className="card space-y-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="text-sm text-muted">{help}</p>
+      <h2 className="text-lg font-semibold">{text.title}</h2>
+      <p className="text-sm text-muted">{text.help}</p>
       {items.length === 0 && (
-        <p className="text-sm text-muted">Nothing here yet.</p>
+        <p className="text-sm text-muted">{t.catalog.nothing}</p>
       )}
       <ul className="space-y-3">
         {items.map((item) => (
@@ -35,11 +33,11 @@ export function CatalogSection({
             <ApiForm
               method="PATCH"
               url={`/api/catalog/${kind}/${item.id}`}
-              submit="Rename"
+              submit={t.catalog.rename}
               className="flex flex-1 flex-wrap items-end gap-2"
             >
               <label className="field flex-1">
-                Name of the {one}
+                {text.nameOf}
                 <input
                   name="name"
                   required
@@ -52,7 +50,7 @@ export function CatalogSection({
             <ApiForm
               method="DELETE"
               url={`/api/catalog/${kind}/${item.id}`}
-              submit={`Delete ${item.name}`}
+              submit={t.settings.deleteNamed(item.name)}
               danger
               className="flex items-end gap-2"
             />
@@ -62,11 +60,11 @@ export function CatalogSection({
       <ApiForm
         method="POST"
         url={`/api/workspaces/${workspaceId}/catalog/${kind}`}
-        submit={`Add ${one}`}
+        submit={text.add}
         className="space-y-2 border-t border-line pt-3"
       >
         <label className="field">
-          New {one}
+          {text.newOne}
           <input name="name" required maxLength={40} className="input" />
         </label>
       </ApiForm>

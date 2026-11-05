@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import { TaskDetails } from "@/components/task-details";
 
@@ -85,6 +86,7 @@ export function TaskDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -109,9 +111,7 @@ export function TaskDialog({
     if (result.conflict) {
       if (result.currentVersion !== undefined)
         setAdoptedVersion(result.currentVersion);
-      setError(
-        "The board changed while this was open. Your changes are still here; check the board and save again.",
-      );
+      setError(t.dialog.conflict);
     } else {
       setError(result.message);
     }
@@ -160,7 +160,7 @@ export function TaskDialog({
   }
 
   async function onDelete() {
-    if (!task || !window.confirm(`Delete “${task.title}”?`)) return;
+    if (!task || !window.confirm(t.dialog.confirmDelete(task.title))) return;
     setPending(true);
     setError(null);
     const result = await api(
@@ -176,10 +176,10 @@ export function TaskDialog({
 
   const heading =
     state?.mode === "create"
-      ? `New task in ${state.columnName}`
+      ? t.dialog.newIn(state.columnName)
       : readOnly
-        ? "Task"
-        : "Edit task";
+        ? t.dialog.task
+        : t.dialog.edit;
 
   return (
     <dialog
@@ -198,7 +198,7 @@ export function TaskDialog({
             {heading}
           </h2>
           <label className="field">
-            Title
+            {t.dialog.title}
             <input
               name="title"
               defaultValue={task?.title ?? ""}
@@ -209,7 +209,7 @@ export function TaskDialog({
             />
           </label>
           <label className="field">
-            Description
+            {t.dialog.description}
             <textarea
               name="description"
               defaultValue={task?.description ?? ""}
@@ -221,27 +221,27 @@ export function TaskDialog({
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="field">
-              Priority
+              {t.dialog.priority}
               <select
                 name="priority"
                 defaultValue={task?.priority ?? "MEDIUM"}
                 disabled={readOnly}
                 className="input"
               >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
+                <option value="LOW">{t.priorities.LOW}</option>
+                <option value="MEDIUM">{t.priorities.MEDIUM}</option>
+                <option value="HIGH">{t.priorities.HIGH}</option>
               </select>
             </label>
             <label className="field">
-              Type
+              {t.dialog.type}
               <select
                 name="typeId"
                 defaultValue={task?.type?.id ?? ""}
                 disabled={readOnly}
                 className="input"
               >
-                <option value="">No type</option>
+                <option value="">{t.dialog.noType}</option>
                 {catalog.types.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.name}
@@ -251,23 +251,23 @@ export function TaskDialog({
             </label>
           </div>
           <Choices
-            legend="Assignees"
+            legend={t.dialog.assignees}
             name="assigneeIds"
             options={members.map((m) => ({ id: m.userId, name: m.name }))}
             checked={task?.assigneeIds ?? []}
             disabled={readOnly}
-            empty="Nobody can be assigned yet."
+            empty={t.dialog.nobodyToAssign}
           />
           <Choices
-            legend="Labels"
+            legend={t.dialog.labels}
             name="labelIds"
             options={catalog.labels}
             checked={task?.labels.map((l) => l.id) ?? []}
             disabled={readOnly}
-            empty="The workspace has no labels yet. An admin can add them in the workspace settings."
+            empty={t.dialog.noLabels}
           />
           <label className="field">
-            Due date
+            {t.dialog.due}
             <input
               type="date"
               name="dueDate"
@@ -278,17 +278,17 @@ export function TaskDialog({
           </label>
           {canWrite && task && (
             <fieldset className="space-y-2 border-t border-line pt-4">
-              <legend className="font-medium">Blocked</legend>
+              <legend className="font-medium">{t.dialog.blockedLegend}</legend>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   name="blocked"
                   defaultChecked={task.blockedReason !== null}
                 />
-                This task is blocked
+                {t.dialog.blockedCheck}
               </label>
               <label className="field">
-                Reason (required while blocked)
+                {t.dialog.blockedReason}
                 <input
                   name="blockedReason"
                   defaultValue={task.blockedReason ?? ""}
@@ -318,7 +318,7 @@ export function TaskDialog({
           <div className="flex flex-wrap items-center gap-2">
             {canWrite && (
               <button type="submit" disabled={pending} className="btn">
-                {state.mode === "create" ? "Create task" : "Save"}
+                {state.mode === "create" ? t.dialog.create : t.dialog.save}
               </button>
             )}
             {/* Read-only, Close is the only action, so it is the primary button. */}
@@ -327,7 +327,7 @@ export function TaskDialog({
               className={canWrite ? "btn-secondary" : "btn"}
               onClick={onClose}
             >
-              {canWrite ? "Cancel" : "Close"}
+              {canWrite ? t.dialog.cancel : t.dialog.close}
             </button>
             {canWrite && task && (
               <button
@@ -336,7 +336,7 @@ export function TaskDialog({
                 className="btn-danger ml-auto"
                 onClick={onDelete}
               >
-                Delete
+                {t.dialog.delete}
               </button>
             )}
           </div>
@@ -371,6 +371,7 @@ function MoveControls({
   disabled: boolean;
   onMove: (columnId: string, toIndex: number) => void;
 }) {
+  const { t } = useT();
   const current = columns.find((c) => c.id === task.columnId);
   const currentIndex = current?.tasks.findIndex((t) => t.id === task.id) ?? 0;
   const [columnId, setColumnId] = useState(task.columnId);
@@ -385,10 +386,10 @@ function MoveControls({
 
   return (
     <fieldset className="space-y-3 border-t border-line pt-4">
-      <legend className="font-medium">Move task</legend>
+      <legend className="font-medium">{t.dialog.moveLegend}</legend>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="field">
-          Column
+          {t.dialog.column}
           <select
             value={columnId}
             className="input"
@@ -412,7 +413,7 @@ function MoveControls({
         </label>
         {!filtered && (
           <label className="field">
-            Position
+            {t.dialog.position}
             <select
               value={toIndex}
               className="input"
@@ -427,18 +428,14 @@ function MoveControls({
           </label>
         )}
       </div>
-      {filtered && (
-        <p className="text-sm text-muted">
-          Filters are on: the task goes to the end of the column.
-        </p>
-      )}
+      {filtered && <p className="text-sm text-muted">{t.dialog.filtersOn}</p>}
       <button
         type="button"
         className="btn-secondary"
         disabled={disabled || unchanged}
         onClick={() => onMove(columnId, filtered ? others : toIndex)}
       >
-        {filtered ? "Move to end" : "Move"}
+        {filtered ? t.dialog.moveToEnd : t.dialog.move}
       </button>
     </fieldset>
   );

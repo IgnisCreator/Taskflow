@@ -1,4 +1,5 @@
 import "server-only";
+import type { Lang } from "@/lib/i18n";
 import type {
   CreateListInput,
   UpdateListInput,
@@ -26,7 +27,11 @@ const listSelect = {
  * The list in a space (optionally one of its folders), with the stages of its flow: the template
  * asked for, else the folder default, else the space default, else the generic one.
  */
-export async function createList(userId: string, input: CreateListInput) {
+export async function createList(
+  userId: string,
+  input: CreateListInput,
+  lang: Lang = "en",
+) {
   const { spaceId, folderId, templateId, ...data } = input;
   return withSpaceLock(
     userId,
@@ -57,6 +62,7 @@ export async function createList(userId: string, input: CreateListInput) {
         space,
         folder,
         templateId,
+        lang,
       );
       return tx.list.create({
         data: {

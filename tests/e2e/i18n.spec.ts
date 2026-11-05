@@ -51,36 +51,27 @@ test.describe("a visitor whose browser asks for Spanish", () => {
   }) => {
     const seed = await seedBoard();
     await context.addCookies(seed.owner.cookies);
-    // Texts of the English catalog for the screens in this step, long enough to be unambiguous.
-    const sections = [
-      en.landing,
-      en.login,
-      en.profile,
-      en.notifications,
-      en.workspaces,
-      en.errors,
-      en.nav,
-    ];
+    // Every long enough text of the English catalog that Spanish words differently.
     const leaves = (value: unknown): string[] =>
       typeof value === "string"
         ? [value]
         : value && typeof value === "object"
           ? Object.values(value).flatMap(leaves)
           : [];
-    const english = sections
-      .flatMap(leaves)
-      .filter((text) => text.length >= 14);
-    const spanishAll = new Set(
-      [
-        es.landing,
-        es.login,
-        es.profile,
-        es.notifications,
-        es.workspaces,
-        es.errors,
-        es.nav,
-      ].flatMap(leaves),
+    const spanishAll = new Set(leaves(es));
+    const english = leaves(en).filter(
+      (text) => text.length >= 14 && !spanishAll.has(text),
     );
+    const checkPage = async (label: string) => {
+      await expect(page.locator("html")).toHaveAttribute("lang", "es");
+      const text = (await page.locator("body").innerText()).replace(
+        /\s+/g,
+        " ",
+      );
+      for (const sentence of english) {
+        expect(text, `${label}: ${sentence}`).not.toContain(sentence);
+      }
+    };
 
     for (const path of [
       "/",
@@ -88,19 +79,27 @@ test.describe("a visitor whose browser asks for Spanish", () => {
       "/notifications",
       "/profile",
       "/does-not-exist",
+      `/w/${seed.workspaceId}`,
+      `/w/${seed.workspaceId}/settings`,
+      `/spaces/${seed.spaceId}`,
+      `/lists/${seed.listId}`,
+      `/lists/${seed.listId}/flow`,
+      `/lists/${seed.listId}/settings`,
+      `/lists/${seed.listId}/activity`,
     ]) {
       await page.goto(path);
-      await expect(page.locator("html")).toHaveAttribute("lang", "es");
-      const text = (await page.locator("body").innerText()).replace(
-        /\s+/g,
-        " ",
-      );
-      for (const sentence of english) {
-        // A text that is the same in both languages (a name) is allowed.
-        if (spanishAll.has(sentence)) continue;
-        expect(text, `${path}: ${sentence}`).not.toContain(sentence);
-      }
+      await checkPage(path);
     }
+
+    // The task dialog, with its checklist, comments and history.
+    await page.goto(`/lists/${seed.listId}`);
+    await page.locator("ul li button", { hasText: "Alpha" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: es.details.checklist }),
+    ).toBeVisible();
+    await checkPage("the task dialog");
+
     // The signed-out pages too.
     await context.clearCookies();
     await page.goto("/login");

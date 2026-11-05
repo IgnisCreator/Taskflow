@@ -3,6 +3,7 @@ import { ApiForm } from "@/components/api-form";
 import { SpaceAccess } from "@/components/space-access";
 import { TemplateSelect } from "@/components/template-select";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { getT } from "@/server/i18n";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { getSpaceSettings } from "@/server/services/spaces";
 import { listTemplates } from "@/server/services/templates";
@@ -14,24 +15,25 @@ export default async function SpacePage({
   params: Promise<{ spaceId: string }>;
 }) {
   const user = await loadUser();
+  const { lang, t } = await getT();
   const space = await getSpaceSettings(user.id, (await params).spaceId);
   if (!space) notFound();
   const workspace = await loadWorkspace(user.id, space.workspaceId);
-  const templates = await listTemplates(user.id, space.workspaceId);
+  const templates = await listTemplates(user.id, space.workspaceId, lang);
   const url = `/api/spaces/${space.id}`;
 
   return (
     <WorkspaceShell workspace={workspace}>
       <main className="space-y-6">
-        <h1 className="text-2xl font-semibold">Space: {space.name}</h1>
+        <h1 className="text-2xl font-semibold">{t.space.title(space.name)}</h1>
         <ApiForm
           method="PATCH"
           url={url}
-          submit="Save"
+          submit={t.space.save}
           className="card space-y-3"
         >
           <label className="field">
-            Name
+            {t.space.name}
             <input
               name="name"
               required
@@ -46,25 +48,22 @@ export default async function SpacePage({
               name="isPrivate"
               defaultChecked={space.isPrivate}
             />
-            Private: only admins and the people listed below can see it
+            {t.space.privateLabel}
           </label>
         </ApiForm>
 
         <ApiForm
           method="PATCH"
           url={url}
-          submit="Save default workflow"
+          submit={t.space.saveDefault}
           className="card space-y-3"
         >
-          <h2 className="text-lg font-semibold">Default workflow</h2>
-          <p className="text-sm text-muted">
-            New lists in this space start with this flow, unless their folder
-            has its own default or you pick another one when creating them.
-          </p>
+          <h2 className="text-lg font-semibold">{t.space.defaultTitle}</h2>
+          <p className="text-sm text-muted">{t.space.defaultHelp}</p>
           <TemplateSelect
             name="defaultTemplate"
-            label="Workflow"
-            none="Generic: to do, in progress, done, discarded"
+            label={t.space.workflow}
+            none={t.space.genericNone}
             templates={templates}
             value={space.defaultTemplate}
           />
@@ -73,10 +72,8 @@ export default async function SpacePage({
         <SpaceAccess spaceId={space.id} people={space.people} />
 
         <section className="card space-y-3">
-          <h2 className="text-lg font-semibold">Folders</h2>
-          <p className="text-sm text-muted">
-            Folders are optional: they group lists inside the space.
-          </p>
+          <h2 className="text-lg font-semibold">{t.space.foldersTitle}</h2>
+          <p className="text-sm text-muted">{t.space.foldersHelp}</p>
           <ul className="space-y-3">
             {space.folders.map((folder) => (
               <li
@@ -86,11 +83,11 @@ export default async function SpacePage({
                 <ApiForm
                   method="PATCH"
                   url={`/api/folders/${folder.id}`}
-                  submit="Rename"
+                  submit={t.space.rename}
                   className="flex flex-1 flex-wrap items-end gap-2"
                 >
                   <label className="field flex-1">
-                    Folder name
+                    {t.space.folderName}
                     <input
                       name="name"
                       required
@@ -103,13 +100,13 @@ export default async function SpacePage({
                 <ApiForm
                   method="PATCH"
                   url={`/api/folders/${folder.id}`}
-                  submit="Save workflow"
+                  submit={t.space.saveWorkflow}
                   className="flex flex-wrap items-end gap-2"
                 >
                   <TemplateSelect
                     name="defaultTemplate"
-                    label={`Default workflow of ${folder.name}`}
-                    none="Same as the space"
+                    label={t.space.defaultOf(folder.name)}
+                    none={t.space.sameAsSpace}
                     templates={templates}
                     value={folder.defaultTemplate}
                   />
@@ -117,7 +114,7 @@ export default async function SpacePage({
                 <ApiForm
                   method="DELETE"
                   url={`/api/folders/${folder.id}`}
-                  submit={`Delete ${folder.name}`}
+                  submit={t.space.deleteNamed(folder.name)}
                   danger
                   confirmText={folder.name}
                   className="flex flex-wrap items-end gap-2"
@@ -128,11 +125,11 @@ export default async function SpacePage({
           <ApiForm
             method="POST"
             url={`${url}/folders`}
-            submit="Add folder"
+            submit={t.space.addFolder}
             className="space-y-2 border-t border-line pt-3"
           >
             <label className="field">
-              New folder
+              {t.space.newFolder}
               <input name="name" required maxLength={80} className="input" />
             </label>
           </ApiForm>
@@ -142,17 +139,15 @@ export default async function SpacePage({
           method="DELETE"
           url={url}
           redirectTo={`/w/${space.workspaceId}`}
-          submit="Delete space"
+          submit={t.space.deleteSpace}
           danger
           confirmText={space.name}
           className="card-danger space-y-3"
         >
           <h2 className="text-lg font-semibold text-danger-text">
-            Delete space
+            {t.space.deleteSpace}
           </h2>
-          <p className="text-sm text-muted">
-            This permanently deletes its folders, lists and tasks.
-          </p>
+          <p className="text-sm text-muted">{t.space.deleteSpaceHint}</p>
         </ApiForm>
       </main>
     </WorkspaceShell>

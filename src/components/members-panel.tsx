@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ApiForm } from "@/components/api-form";
+import { useT } from "@/components/lang-provider";
 import { api } from "@/lib/api-client";
 import { roleLabel } from "@/lib/roles";
 import type { Role } from "@/lib/validations/workspaces";
@@ -23,6 +24,7 @@ export function MembersPanel({
   labels: Record<string, string>;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const base = `/api/workspaces/${workspaceId}/members`;
@@ -42,7 +44,7 @@ export function MembersPanel({
   return (
     <section className="card space-y-4">
       <h2 className="text-lg font-semibold">
-        Members <span className="badge">{members.length} / 20</span>
+        {t.members.title} <span className="badge">{members.length} / 20</span>
       </h2>
       <ul className="divide-y divide-line">
         {members.map((member) => (
@@ -54,7 +56,7 @@ export function MembersPanel({
             <span className="flex items-center gap-2">
               {canManageMember(actor, { from: member.role, to: "GUEST" }) ? (
                 <select
-                  aria-label={`Role of ${member.name}`}
+                  aria-label={t.members.roleOf(member.name)}
                   value={member.role}
                   disabled={pending}
                   className="input mt-0 w-auto"
@@ -68,13 +70,13 @@ export function MembersPanel({
                 >
                   {grantable.map((role) => (
                     <option key={role} value={role}>
-                      {roleLabel(labels, role)}
+                      {roleLabel(labels, role, t.roles)}
                     </option>
                   ))}
                 </select>
               ) : (
                 <span className="badge normal-case">
-                  {roleLabel(labels, member.role)}
+                  {roleLabel(labels, member.role, t.roles)}
                 </span>
               )}
               {canManageMember(actor, { from: member.role }) && (
@@ -83,18 +85,14 @@ export function MembersPanel({
                   disabled={pending}
                   className="btn-secondary"
                   onClick={() => {
-                    if (
-                      window.confirm(
-                        `Remove ${member.name}? Their tasks in this workspace become unassigned.`,
-                      )
-                    ) {
+                    if (window.confirm(t.members.confirmRemove(member.name))) {
                       void run(() =>
                         api("DELETE", `${base}/${member.userId}`, {}),
                       );
                     }
                   }}
                 >
-                  Remove {member.name}
+                  {t.members.remove(member.name)}
                 </button>
               )}
             </span>
@@ -110,24 +108,21 @@ export function MembersPanel({
         <ApiForm
           method="POST"
           url={base}
-          submit="Add member"
+          submit={t.members.add}
           className="space-y-3 border-t border-line pt-4"
         >
-          <h3 className="font-medium">Add a member</h3>
-          <p className="text-sm text-muted">
-            The person needs an account already. Use the exact email they sign
-            in with.
-          </p>
+          <h3 className="font-medium">{t.members.addTitle}</h3>
+          <p className="text-sm text-muted">{t.members.addHint}</p>
           <label className="field">
-            Email
+            {t.members.email}
             <input name="email" type="email" required className="input" />
           </label>
           <label className="field">
-            Role
+            {t.members.role}
             <select name="role" defaultValue="MEMBER" className="input">
               {grantable.map((role) => (
                 <option key={role} value={role}>
-                  {roleLabel(labels, role)}
+                  {roleLabel(labels, role, t.roles)}
                 </option>
               ))}
             </select>

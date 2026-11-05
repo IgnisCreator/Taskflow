@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getT } from "@/server/i18n";
 import { can } from "@/server/policies";
 import type { getWorkspace } from "@/server/services/workspaces";
 
@@ -10,7 +11,7 @@ type ListLink = { id: string; name: string };
  * Two columns: the workspace tree (spaces, folders, lists the user can see) and the page. On small
  * screens the tree folds into a native <details> above the page.
  */
-export function WorkspaceShell({
+export async function WorkspaceShell({
   workspace,
   currentListId,
   children,
@@ -19,12 +20,13 @@ export function WorkspaceShell({
   currentListId?: string;
   children: ReactNode;
 }) {
+  const { t } = await getT();
   const tree = <Tree workspace={workspace} currentListId={currentListId} />;
   return (
     <div className="gap-8 lg:grid lg:grid-cols-[15rem_1fr]">
       <details className="card mb-6 p-3 lg:hidden">
         <summary className="cursor-pointer font-medium">
-          {workspace.name}: spaces and lists
+          {t.shell.foldSummary(workspace.name)}
         </summary>
         <div className="mt-3">{tree}</div>
       </details>
@@ -34,13 +36,14 @@ export function WorkspaceShell({
   );
 }
 
-function Tree({
+async function Tree({
   workspace,
   currentListId,
 }: {
   workspace: Workspace;
   currentListId?: string;
 }) {
+  const { t } = await getT();
   const admin = can(workspace, "structure:manage");
   const link = (list: ListLink) => (
     <li key={list.id}>
@@ -54,7 +57,7 @@ function Tree({
     </li>
   );
   return (
-    <nav aria-label="Workspace" className="space-y-4 text-sm">
+    <nav aria-label={t.shell.nav} className="space-y-4 text-sm">
       <div className="space-y-1">
         <Link
           href={`/w/${workspace.id}`}
@@ -64,26 +67,28 @@ function Tree({
         </Link>
         <p className="flex gap-3 text-xs">
           <Link href={`/w/${workspace.id}/settings`} className="link">
-            Settings
+            {t.shell.settings}
           </Link>
           <Link href="/workspaces" className="link">
-            Switch workspace
+            {t.shell.switchWorkspace}
           </Link>
         </p>
       </div>
       {workspace.spaces.length === 0 && (
-        <p className="text-muted">No spaces you can see yet.</p>
+        <p className="text-muted">{t.shell.noSpaces}</p>
       )}
       {workspace.spaces.map((space) => (
         <div key={space.id} className="space-y-1">
           <p className="flex items-center justify-between gap-2 px-2 text-xs font-semibold tracking-wide text-muted uppercase">
             <span className="truncate">
               {space.name}
-              {space.isPrivate && <span className="sr-only"> (private)</span>}
+              {space.isPrivate && (
+                <span className="sr-only">{t.shell.privateSr}</span>
+              )}
             </span>
             {space.isPrivate && (
               <span aria-hidden="true" className="badge">
-                private
+                {t.shell.private}
               </span>
             )}
           </p>
@@ -94,7 +99,9 @@ function Tree({
                 <ul className="ml-3 border-l border-line pl-1">
                   {folder.lists.map(link)}
                   {folder.lists.length === 0 && (
-                    <li className="px-2 py-1 text-xs text-muted">Empty</li>
+                    <li className="px-2 py-1 text-xs text-muted">
+                      {t.shell.empty}
+                    </li>
                   )}
                 </ul>
               </li>
@@ -105,14 +112,14 @@ function Tree({
             href={`/spaces/${space.id}/metrics`}
             className="link block px-2 text-xs"
           >
-            Metrics of {space.name}
+            {t.shell.metricsOf(space.name)}
           </Link>
           {admin && (
             <Link
               href={`/spaces/${space.id}`}
               className="link block px-2 text-xs"
             >
-              Manage {space.name}
+              {t.shell.manage(space.name)}
             </Link>
           )}
         </div>

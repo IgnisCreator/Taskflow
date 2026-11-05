@@ -1,5 +1,7 @@
 // How a history event reads to people. Pure, so the dialog, the activity page and the tests agree.
 
+import { en, type Catalog } from "@/lib/i18n/en";
+
 export type EventView = {
   type:
     "CREATED" | "MOVED" | "BLOCKED" | "UNBLOCKED" | "DISCARDED" | "REOPENED";
@@ -8,25 +10,26 @@ export type EventView = {
   actor: string;
 };
 
-// A stage that was deleted later keeps its category in the event but loses its name.
-const stage = (s: { name: string } | null) => (s ? s.name : "a removed stage");
-
-/** One line, e.g. "Ana moved it from To do to In progress". */
-export function describeEvent(event: EventView): string {
+/** One line, e.g. "Ana moved it from To do to In progress" (English unless `t` says otherwise). */
+export function describeEvent(event: EventView, t: Catalog = en): string {
   const { actor } = event;
-  const route = `from ${stage(event.fromStage)} to ${stage(event.toStage)}`;
+  const e = t.events;
+  // A stage that was deleted later keeps its category in the event but loses its name.
+  const stage = (s: { name: string } | null) => (s ? s.name : e.removedStage);
+  const from = stage(event.fromStage);
+  const to = stage(event.toStage);
   switch (event.type) {
     case "CREATED":
-      return `${actor} created it in ${stage(event.toStage)}`;
+      return e.created(actor, to);
     case "MOVED":
-      return `${actor} moved it ${route}`;
+      return e.moved(actor, from, to);
     case "DISCARDED":
-      return `${actor} discarded it (${route})`;
+      return e.discarded(actor, from, to);
     case "REOPENED":
-      return `${actor} reopened it (${route})`;
+      return e.reopened(actor, from, to);
     case "BLOCKED":
-      return `${actor} blocked it in ${stage(event.toStage)}`;
+      return e.blocked(actor, to);
     case "UNBLOCKED":
-      return `${actor} unblocked it in ${stage(event.toStage)}`;
+      return e.unblocked(actor, to);
   }
 }

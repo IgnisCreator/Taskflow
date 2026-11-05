@@ -13,5 +13,20 @@ process.env.DATABASE_URL ??=
 // Route handlers read the session through `next/headers`, which only exists inside a request.
 vi.mock("next/headers", async () => {
   const { getRequestHeaders } = await import("./helpers/request-context");
-  return { headers: async () => getRequestHeaders() };
+  // `cookies()` reads the cookie header of the same fake request.
+  return {
+    headers: async () => getRequestHeaders(),
+    cookies: async () => {
+      const cookie = getRequestHeaders().get("cookie") ?? "";
+      return {
+        get: (name: string) => {
+          const found = cookie
+            .split(";")
+            .map((part) => part.trim().split("="))
+            .find(([key]) => key === name);
+          return found ? { name, value: found[1] ?? "" } : undefined;
+        },
+      };
+    },
+  };
 });

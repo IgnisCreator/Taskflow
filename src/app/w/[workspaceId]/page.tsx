@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ApiForm } from "@/components/api-form";
 import { TemplateSelect } from "@/components/template-select";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { formatNumber } from "@/lib/i18n";
 import { roleLabel } from "@/lib/roles";
+import { getT } from "@/server/i18n";
 import { currentTime, loadUser, loadWorkspace } from "@/server/load";
 import { can } from "@/server/policies";
 import { parseMetricsQuery } from "@/lib/validations/metrics";
@@ -15,12 +17,13 @@ export default async function WorkspacePage({
   params: Promise<{ workspaceId: string }>;
 }) {
   const user = await loadUser();
+  const { lang, t } = await getT();
   const workspace = await loadWorkspace(user.id, (await params).workspaceId);
   const admin = can(workspace, "structure:manage");
   const now = currentTime();
   const last30 = parseMetricsQuery({}, now);
   const [templates, summaries] = await Promise.all([
-    listTemplates(user.id, workspace.id),
+    listTemplates(user.id, workspace.id, lang),
     Promise.all(
       workspace.spaces.map((space) =>
         getSpaceMetrics(user.id, space.id, last30, now),
@@ -34,14 +37,12 @@ export default async function WorkspacePage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">{workspace.name}</h1>
           <span className="badge normal-case">
-            {roleLabel(workspace.roleLabels, workspace.role)}
+            {roleLabel(workspace.roleLabels, workspace.role, t.roles)}
           </span>
         </div>
 
         {workspace.spaces.length === 0 && (
-          <p className="card text-muted">
-            There are no spaces you can see yet. An admin can add you to one.
-          </p>
+          <p className="card text-muted">{t.workspace.noSpaces}</p>
         )}
         <ul className="grid gap-4 sm:grid-cols-2">
           {workspace.spaces.map((space, index) => {
@@ -54,28 +55,32 @@ export default async function WorkspacePage({
               <li key={space.id} className="card space-y-3">
                 <h2 className="flex items-center justify-between gap-2 font-semibold">
                   {space.name}
-                  {space.isPrivate && <span className="badge">private</span>}
+                  {space.isPrivate && (
+                    <span className="badge">{t.shell.private}</span>
+                  )}
                 </h2>
                 <dl
-                  aria-label={`Last 30 days in ${space.name}`}
+                  aria-label={t.workspace.last30(space.name)}
                   className="grid grid-cols-3 gap-2 text-sm"
                 >
                   <div>
-                    <dt className="text-muted">Finished</dt>
+                    <dt className="text-muted">{t.workspace.finished}</dt>
                     <dd className="font-semibold">
                       {summary.throughput.total}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted">Median cycle</dt>
+                    <dt className="text-muted">{t.workspace.medianCycle}</dt>
                     <dd className="font-semibold">
                       {summary.cycleTime.p50 === null
                         ? "-"
-                        : `${summary.cycleTime.p50.toFixed(1)} days`}
+                        : t.units.days(
+                            formatNumber(summary.cycleTime.p50, lang),
+                          )}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted">In progress</dt>
+                    <dt className="text-muted">{t.workspace.inProgress}</dt>
                     <dd className="font-semibold">{summary.wip.total}</dd>
                   </div>
                 </dl>
@@ -83,10 +88,10 @@ export default async function WorkspacePage({
                   href={`/spaces/${space.id}/metrics`}
                   className="link block text-sm"
                 >
-                  Metrics of {space.name}
+                  {t.shell.metricsOf(space.name)}
                 </Link>
                 {lists.length === 0 ? (
-                  <p className="text-sm text-muted">No lists yet.</p>
+                  <p className="text-sm text-muted">{t.workspace.noLists}</p>
                 ) : (
                   <ul className="space-y-1 text-sm">
                     {lists.map((list) => (
@@ -104,11 +109,11 @@ export default async function WorkspacePage({
                     url="/api/lists"
                     extra={{ spaceId: space.id }}
                     redirectTo="/lists/{id}"
-                    submit="Create list"
+                    submit={t.workspace.createList}
                     className="space-y-2 border-t border-line pt-3"
                   >
                     <label className="field">
-                      New list
+                      {t.workspace.newList}
                       <input
                         name="name"
                         required
@@ -118,19 +123,19 @@ export default async function WorkspacePage({
                     </label>
                     <TemplateSelect
                       name="templateId"
-                      label="Workflow"
-                      none="Default for this space or folder"
+                      label={t.workspace.workflow}
+                      none={t.workspace.defaultFlow}
                       templates={templates}
                     />
                     {space.folders.length > 0 && (
                       <label className="field">
-                        Folder
+                        {t.workspace.folder}
                         <select
                           name="folderId"
                           defaultValue=""
                           className="input"
                         >
-                          <option value="">No folder</option>
+                          <option value="">{t.workspace.noFolder}</option>
                           {space.folders.map((folder) => (
                             <option key={folder.id} value={folder.id}>
                               {folder.name}
@@ -150,20 +155,18 @@ export default async function WorkspacePage({
           <ApiForm
             method="POST"
             url={`/api/workspaces/${workspace.id}/spaces`}
-            submit="Create space"
+            submit={t.workspace.createSpace}
             className="card space-y-3"
           >
-            <h2 className="text-lg font-semibold">New space</h2>
-            <p className="text-sm text-muted">
-              A space groups the lists of one area, such as Software or Support.
-            </p>
+            <h2 className="text-lg font-semibold">{t.workspace.newSpace}</h2>
+            <p className="text-sm text-muted">{t.workspace.newSpaceHint}</p>
             <label className="field">
-              Name
+              {t.workspace.name}
               <input name="name" required maxLength={80} className="input" />
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="isPrivate" />
-              Private: only admins and the people you add can see it
+              {t.workspace.privateLabel}
             </label>
           </ApiForm>
         )}

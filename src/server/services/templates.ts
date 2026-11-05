@@ -1,5 +1,7 @@
 import "server-only";
 import { z } from "zod";
+import type { Lang } from "@/lib/i18n";
+import { localizeTemplate } from "@/lib/i18n/templates";
 import { stageSchema } from "@/lib/validations/workflow";
 import {
   DEFAULT_TEMPLATE,
@@ -42,7 +44,11 @@ async function flowOfList(tx: Tx, workspaceId: string, listId: string) {
 }
 
 /** System templates and the organisation's own, for pickers (members only: others get 404). */
-export async function listTemplates(userId: string, workspaceId: string) {
+export async function listTemplates(
+  userId: string,
+  workspaceId: string,
+  lang: Lang = "en",
+) {
   const workspace = await db.workspace.findFirst({
     where: { id: workspaceId, members: { some: { userId } } },
     select: {
@@ -56,7 +62,7 @@ export async function listTemplates(userId: string, workspaceId: string) {
   return {
     system: Object.entries(SYSTEM_TEMPLATES).map(([key, template]) => ({
       ref: `system:${key}`,
-      ...template,
+      ...localizeTemplate(key, template, lang),
     })),
     organisation: workspace.templates.map((template) => ({
       ref: template.id,
@@ -66,15 +72,21 @@ export async function listTemplates(userId: string, workspaceId: string) {
   };
 }
 
-/** The stages behind a template reference ("system:<key>" or an id of this workspace), or null. */
+/**
+ * The stages behind a template reference ("system:<key>" or an id of this workspace), or null. The
+ * names of a system template come in `lang`; a workspace's own templates are what people typed.
+ */
 export async function resolveTemplate(
   tx: Tx,
   workspaceId: string,
   ref: string | null | undefined,
+  lang: Lang = "en",
 ): Promise<FlowStage[] | null> {
   if (!ref) return null;
   const system = systemTemplate(ref);
-  if (system) return system.stages;
+  if (system) {
+    return localizeTemplate(ref.slice("system:".length), system, lang).stages;
+  }
   const row = await tx.workflowTemplate.findFirst({
     where: { id: ref, workspaceId },
     select: { stages: true },
@@ -89,9 +101,10 @@ export async function flowForNewList(
   space: { defaultTemplate: string | null },
   folder: { defaultTemplate: string | null } | null,
   asked: string | null,
+  lang: Lang = "en",
 ): Promise<FlowStage[]> {
   if (asked) {
-    const flow = await resolveTemplate(tx, workspaceId, asked);
+    const flow = await resolveTemplate(tx, workspaceId, asked, lang);
     if (!flow)
       throw new ApiError(
         400,
@@ -102,10 +115,14 @@ export async function flowForNewList(
   }
   for (const ref of [folder?.defaultTemplate, space.defaultTemplate]) {
     // A default whose template was deleted just falls through to the next one.
-    const flow = await resolveTemplate(tx, workspaceId, ref);
+    const flow = await resolveTemplate(tx, workspaceId, ref, lang);
     if (flow) return flow;
   }
-  return systemTemplate(DEFAULT_TEMPLATE)!.stages;
+  return localizeTemplate(
+    DEFAULT_TEMPLATE.slice("system:".length),
+    systemTemplate(DEFAULT_TEMPLATE)!,
+    lang,
+  ).stages;
 }
 
 /** Throws unless `ref` is "system:<key>" or a template of this workspace (for setting a default). */

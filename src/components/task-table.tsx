@@ -17,8 +17,6 @@ import {
   type TaskView,
 } from "@/components/task-dialog";
 
-const PRIORITY_LABEL = { LOW: "low", MEDIUM: "medium", HIGH: "high" } as const;
-
 type Row = TaskView & {
   stage: string;
   stageIndex: number;
@@ -60,7 +58,7 @@ export function TaskTable({
   query: string;
 }) {
   const router = useRouter();
-  const { t: all } = useT();
+  const { lang, t: all } = useT();
   const t = all.table;
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -209,7 +207,7 @@ export function TaskTable({
                     <span
                       className={`badge ${task.priority === "HIGH" ? "text-danger-text" : ""}`}
                     >
-                      {PRIORITY_LABEL[task.priority]}
+                      {all.priorities[task.priority].toLowerCase()}
                     </span>
                   </td>
                   <td className="px-3 py-2">{task.type?.name ?? ""}</td>
@@ -226,7 +224,7 @@ export function TaskTable({
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    {task.dueDate ? formatDueDate(task.dueDate) : ""}
+                    {task.dueDate ? formatDueDate(task.dueDate, lang) : ""}
                   </td>
                   <td className="px-3 py-2">
                     <span className="flex flex-wrap items-center gap-2">
@@ -235,12 +233,15 @@ export function TaskTable({
                           className="badge text-danger-text"
                           title={task.blockedReason}
                         >
-                          blocked
+                          {all.card.blocked}
                         </span>
                       )}
                       {task.subtasks.total > 0 && (
                         <span className="text-muted">
-                          {task.subtasks.done}/{task.subtasks.total} done
+                          {all.card.checklist(
+                            task.subtasks.done,
+                            task.subtasks.total,
+                          )}
                         </span>
                       )}
                     </span>

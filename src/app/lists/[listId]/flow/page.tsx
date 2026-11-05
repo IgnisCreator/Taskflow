@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ApiForm } from "@/components/api-form";
 import { FlowEditor, type TemplateOption } from "@/components/flow-editor";
 import { WorkspaceShell } from "@/components/workspace-shell";
+import { getT } from "@/server/i18n";
 import { loadUser, loadWorkspace } from "@/server/load";
 import { getFlow } from "@/server/services/flow";
 import { listTemplates } from "@/server/services/templates";
@@ -16,25 +17,26 @@ export default async function FlowPage({
   searchParams: Promise<{ saved?: string }>;
 }) {
   const user = await loadUser();
+  const { lang, t } = await getT();
   const flow = await getFlow(user.id, (await params).listId);
   if (!flow) notFound();
   const { list, stages } = flow;
   const [workspace, templates] = await Promise.all([
     loadWorkspace(user.id, list.workspaceId),
-    listTemplates(user.id, list.workspaceId),
+    listTemplates(user.id, list.workspaceId, lang),
   ]);
   const options: TemplateOption[] = [
     ...templates.system.map(({ ref, name, stages }) => ({
       ref,
       name,
       stages,
-      group: "System" as const,
+      group: "system" as const,
     })),
     ...templates.organisation.map(({ ref, name, stages }) => ({
       ref,
       name,
       stages,
-      group: "Your workspace" as const,
+      group: "workspace" as const,
     })),
   ];
 
@@ -43,10 +45,10 @@ export default async function FlowPage({
       <main className="space-y-6">
         <p className="text-sm">
           <Link href={`/lists/${list.id}/settings`} className="link">
-            &larr; List settings
+            &larr; {t.listPage.settings}
           </Link>
         </p>
-        <h1 className="text-2xl font-semibold">Workflow of {list.name}</h1>
+        <h1 className="text-2xl font-semibold">{t.flow.title(list.name)}</h1>
         {/* The version in the key resets the editor after every save or refresh. */}
         <FlowEditor
           key={list.boardVersion}
@@ -60,18 +62,13 @@ export default async function FlowPage({
           method="POST"
           url={`/api/workspaces/${list.workspaceId}/templates`}
           extra={{ fromListId: list.id }}
-          submit="Save as template"
+          submit={t.flow.saveAsTemplate}
           className="card space-y-3"
         >
-          <h2 className="text-lg font-semibold">
-            Save this flow as a template
-          </h2>
-          <p className="text-sm text-muted">
-            Saves the flow as it is stored now (save your changes first). Anyone
-            in the workspace can then start a list from it.
-          </p>
+          <h2 className="text-lg font-semibold">{t.flow.saveTemplateTitle}</h2>
+          <p className="text-sm text-muted">{t.flow.saveTemplateHelp}</p>
           <label className="field">
-            Template name
+            {t.flow.templateName}
             <input name="name" required maxLength={60} className="input" />
           </label>
         </ApiForm>
