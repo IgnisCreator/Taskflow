@@ -130,8 +130,9 @@ test("restarting gives fresh data, leaving deletes the sandbox, and an old one i
   await explore(page);
   const before = page.url();
   await page.getByRole("button", { name: "Restart demo" }).click();
+  // A new workspace: the address changes (the old one matches the pattern too, so wait for the change).
+  await expect(page).not.toHaveURL(before);
   await expect(page).toHaveURL(/\/w\/[\w-]+$/);
-  expect(page.url()).not.toBe(before);
   expect(
     await prisma.workspace.count({ where: { id: before.split("/w/")[1] } }),
   ).toBe(0);
